@@ -93,6 +93,10 @@ tracecode/
 
 如果没有 API Key，可以设置 `ENABLE_REAL_*=false` 使用模拟数据演示功能。
 
+## 🚀 Long-term evolution roadmap
+
+To keep the team aligned, we maintain a living roadmap in docs/01-长期演进规划.md that details phased milestones (P0-P3), success criteria, and notes for ongoing collaboration.
+
 ## 📖 API 文档
 
 ### POST /api/inspect
