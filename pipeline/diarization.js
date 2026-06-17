@@ -246,45 +246,66 @@ class DiarizationEngine {
 
   /**
    * 检测说话人角色
-   * 策略：
-   *   A) 第一个说话的默认为 agent（客服主动开场）
-   *   B) 用关键词校验，如果第一个说话人包含客户特征词则交换
+   * 核心思路：不假设谁先说话，而是比较每个说话人的关键词得分
+   * 客服特征词得分高的 → agent，客户特征词得分高的 → customer
    */
   _detectRoles(utterances) {
     const speakers = [...new Set(utterances.map(u => u.speaker))];
     if (speakers.length === 0) return {};
 
-    // 默认：第一个说话的 = agent
-    const firstSpeaker = utterances[0].speaker;
-    let roleMap = {};
-    for (const s of speakers) {
-      roleMap[s] = s === firstSpeaker ? "agent" : "customer";
-    }
-
-    // 关键词校验
-    const agentKeywords = /请问|欢迎致电|您好.*客服|帮您|为您|这边是|我帮您|您.*需要|工号/;
-    const customerKeywords = /我想|我要|咨询|投诉|怎么.*办|多少钱|怎么回事|退货|退款|我的订单|你们.*什么/;
-
+    // 收集每个说话人的文本
     const speakerTexts = {};
     for (const u of utterances) {
       if (!speakerTexts[u.speaker]) speakerTexts[u.speaker] = [];
       speakerTexts[u.speaker].push(u.text);
     }
 
+    // 客服特征词（服务方常用语）
+    const agentPattern = /请问|欢迎致电|您好.*客服|帮您|为您|这边是|我帮您|您.*需要|工号|您.*方便|温馨提示|回访|跟进|安排|为您.*办理|请问.*需要|核实|确认.*信息|您.*排在|社工|联系您|电话畅通/;
+    // 客户特征词（需求方常用语）
+    const custPattern = /我想|我要|咨询|投诉|多少钱|怎么回事|退货|退款|我的订单|你们.*什么|好的.*谢谢|什么时候|多久|有没有|怎么办|办了|医保|新农合|好好好|那.*那|是吧|嗯嗯/;
+
+    // 计算每个说话人的客服得分和客户得分
     const scores = {};
     for (const s of speakers) {
-      const texts = speakerTexts[s].join("");
-      const agentHits = (texts.match(agentKeywords) || []).length;
-      const custHits = (texts.match(customerKeywords) || []).length;
+      const text = speakerTexts[s].join("");
+      const agentHits = (text.match(agentPattern) || []).length;
+      const custHits = (text.match(custPattern) || []).length;
       scores[s] = { agentHits, custHits };
+      logger.info(`[说话人分离] ${s}: 客服词=${agentHits}, 客户词=${custHits}`);
     }
 
-    // 如果第一个说话人的客户关键词 > agent 关键词，说明角色反了，需要交换
-    const firstScores = scores[firstSpeaker];
-    if (firstScores && firstScores.custHits > firstScores.agentHits + 1) {
-      logger.info(`[说话人分离] 检测到角色反转: ${firstSpeaker} 客户特征更强，交换角色`);
-      for (const s of speakers) {
-        roleMap[s] = s === firstSpeaker ? "customer" : "agent";
+    // 根据得分分配角色：客服得分最高的 → agent，另一个 → customer
+    let roleMap = {};
+    if (speakers.length === 1) {
+      roleMap[speakers[0]] = "agent";
+    } else {
+      // 比较两个说话人的客服得分
+      const s0 = speakers[0], s1 = speakers[1];
+      const agentScore0 = scores[s0].agentHits - scores[s0].custHits;
+      const agentScore1 = scores[s1].agentHits - scores[s1].custHits;
+
+      if (agentScore0 > agentScore1) {
+        roleMap[s0] = "agent";
+        roleMap[s1] = "customer";
+      } else if (agentScore1 > agentScore0) {
+        roleMap[s0] = "customer";
+        roleMap[s1] = "agent";
+      } else {
+        // 得分相同时，使用"您"的频率判断（客服对客户用"您"，客户很少用"您"）
+        const ninCount0 = (speakerTexts[s0].join("").match(/您/g) || []).length;
+        const ninCount1 = (speakerTexts[s1].join("").match(/您/g) || []).length;
+        if (ninCount0 > ninCount1) {
+          roleMap[s0] = "agent";
+          roleMap[s1] = "customer";
+        } else if (ninCount1 > ninCount0) {
+          roleMap[s0] = "customer";
+          roleMap[s1] = "agent";
+        } else {
+          // 最终兜底：默认第一个是 customer（接电话方）
+          roleMap[s0] = "customer";
+          roleMap[s1] = "agent";
+        }
       }
     }
 
