@@ -3,7 +3,9 @@ const path = require("path");
 
 const dataDir = path.join(__dirname, "..", "data");
 const dataFile = path.join(dataDir, "inspections.json");
+const tokenFile = path.join(dataDir, "token-usage.json");
 let inspections = loadInspections();
+let tokenRecords = loadTokenUsage();
 
 function loadInspections() {
   try {
@@ -19,12 +21,34 @@ function loadInspections() {
   }
 }
 
+function loadTokenUsage() {
+  try {
+    if (!fs.existsSync(tokenFile)) return [];
+    let raw = fs.readFileSync(tokenFile, "utf-8");
+    raw = raw.replace(/^\uFEFF/, "").trim();
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    return [];
+  }
+}
+
 function saveInspections() {
   try {
     fs.mkdirSync(dataDir, { recursive: true });
     fs.writeFileSync(dataFile, JSON.stringify(inspections, null, 2), "utf-8");
   } catch (err) {
     console.error("保存质检统计失败:", err);
+  }
+}
+
+function saveTokenUsage() {
+  try {
+    fs.mkdirSync(dataDir, { recursive: true });
+    fs.writeFileSync(tokenFile, JSON.stringify(tokenRecords, null, 2), "utf-8");
+  } catch (err) {
+    console.error("保存 Token 统计失败:", err);
   }
 }
 
@@ -65,10 +89,113 @@ function addInspection(result) {
     quality: result.quality,
     summary: result.summary,
     callSummary: result.callSummary || result.summary,
+    usedMultimodal: result.usedMultimodal || false,
+    apiCallCount: result.apiCallCount || 4,
   };
   inspections.push(record);
   saveInspections();
+
+  // 记录 Token 用量
+  addTokenRecord(result);
+
   return record;
+}
+
+/**
+ * 记录单次质检的 API 调用和 Token 用量
+ */
+function addTokenRecord(result) {
+  const utteranceText = (result.utterances || []).map(u => u.text).join("");
+  const textTokens = Math.ceil(utteranceText.length * 1.5); // 中文约 1.5 token/字
+  const summaryText = JSON.stringify(result.summary || {});
+  const summaryTokens = Math.ceil(summaryText.length * 1.5);
+  const totalTimeSec = parseFloat(result.totalTime) || 0;
+
+  // 估算音频 token：MiMo ASR 约 1 token/秒的音频特征
+  const audioTokens = Math.ceil(totalTimeSec * 8);
+
+  const usedMultimodal = result.usedMultimodal || false;
+
+  const record = {
+    timestamp: new Date().toISOString(),
+    fileName: result.fileName,
+    duration: totalTimeSec,
+    usedMultimodal,
+    // 实际调用
+    actualApiCalls: usedMultimodal ? 2 : 4,
+    actualAudioCalls: usedMultimodal ? 1 : 3,
+    actualTextCalls: 1,
+    actualTokens: {
+      audioInput: audioTokens * (usedMultimodal ? 1 : 3),
+      textInput: textTokens + summaryTokens,
+      total: audioTokens * (usedMultimodal ? 1 : 3) + textTokens + summaryTokens,
+    },
+    // 如果没优化（旧方案）的预估
+    legacyApiCalls: 4,
+    legacyAudioCalls: 3,
+    legacyTokens: {
+      audioInput: audioTokens * 3,
+      textInput: textTokens + summaryTokens,
+      total: audioTokens * 3 + textTokens + summaryTokens,
+    },
+    // 节省量
+    savedApiCalls: usedMultimodal ? 2 : 0,
+    savedTokens: usedMultimodal ? audioTokens * 2 : 0,
+    savedPercent: usedMultimodal ? Math.round((audioTokens * 2) / (audioTokens * 3 + textTokens + summaryTokens) * 100) : 0,
+  };
+
+  tokenRecords.push(record);
+  saveTokenUsage();
+}
+
+/**
+ * 获取 Token 用量统计
+ */
+function getTokenStats() {
+  const total = tokenRecords.length;
+  if (total === 0) {
+    return {
+      total: 0,
+      multimodalCount: 0,
+      legacyCount: 0,
+      totalSavedCalls: 0,
+      totalSavedTokens: 0,
+      avgSavedPercent: 0,
+      records: [],
+      summary: {
+        actualTotalTokens: 0,
+        legacyTotalTokens: 0,
+        actualTotalCalls: 0,
+        legacyTotalCalls: 0,
+      },
+    };
+  }
+
+  const multimodalRecords = tokenRecords.filter(r => r.usedMultimodal);
+  const legacyRecords = tokenRecords.filter(r => !r.usedMultimodal);
+
+  const actualTotalTokens = tokenRecords.reduce((s, r) => s + r.actualTokens.total, 0);
+  const legacyTotalTokens = tokenRecords.reduce((s, r) => s + r.legacyTokens.total, 0);
+  const actualTotalCalls = tokenRecords.reduce((s, r) => s + r.actualApiCalls, 0);
+  const legacyTotalCalls = tokenRecords.reduce((s, r) => s + r.legacyApiCalls, 0);
+  const totalSavedCalls = tokenRecords.reduce((s, r) => s + r.savedApiCalls, 0);
+  const totalSavedTokens = tokenRecords.reduce((s, r) => s + r.savedTokens, 0);
+
+  return {
+    total,
+    multimodalCount: multimodalRecords.length,
+    legacyCount: legacyRecords.length,
+    totalSavedCalls,
+    totalSavedTokens,
+    avgSavedPercent: total > 0 ? Math.round(tokenRecords.reduce((s, r) => s + r.savedPercent, 0) / total) : 0,
+    summary: {
+      actualTotalTokens,
+      legacyTotalTokens,
+      actualTotalCalls,
+      legacyTotalCalls,
+    },
+    records: tokenRecords.slice().reverse().slice(0, 50),
+  };
 }
 
 function getStats() {
@@ -94,7 +221,7 @@ function getStats() {
   const dimKeys = ["compliance", "knowledge", "process", "communication"];
   const avgDimensions = {};
   dimKeys.forEach((k) => {
-    avgDimensions[k] = Math.round(inspections.reduce((s, r) => s + (r.dimensions[k] || 0), 0) / total * 10) / 10;
+    avgDimensions[k] = Math.round(inspections.reduce((s, r) => s + (r.dimensions[k]?.score || 0), 0) / total * 10) / 10;
   });
 
   const emotionDistribution = {};
@@ -164,4 +291,4 @@ function getHistory(page = 1, pageSize = 20) {
   return { items, total, page, pageSize, totalPages };
 }
 
-module.exports = { addInspection, getStats, getHistory };
+module.exports = { addInspection, getStats, getHistory, getTokenStats };

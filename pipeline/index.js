@@ -32,6 +32,8 @@ class QualityInspectionPipeline {
   async run(audioPath, fileName, scenarioId, onStep) {
     const steps = [];
     const startTime = Date.now();
+    const sessionId = logger.setSessionId();
+    logger.info(`[Pipeline] 质检开始: ${fileName}, sessionId: ${sessionId}`);
 
     // Check if using a predefined scenario
     const scenario = scenarioId ? getScenario(scenarioId) : null;
@@ -129,7 +131,9 @@ class QualityInspectionPipeline {
       summary: summaryResult,
       callSummary: this._generateCallSummary(summaryResult),
       usedMultimodal,
-      apiCallCount: usedMultimodal ? 2 : 5, // 多模态: 1次音频+1次文本=2次; 传统: 3次音频+1次文本+1次预处理=5次
+      apiCallCount: usedMultimodal ? 2 : 5,
+      convertedPath: preprocResult.convertedPath || null,
+      sessionId,
     };
   }
 

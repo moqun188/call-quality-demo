@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
 const QualityInspectionPipeline = require("./pipeline");
 const { getScenarioList } = require("./pipeline/scenarios");
@@ -11,6 +12,20 @@ const { exportToObsidian, getVaultStats } = require("./pipeline/obsidianExporter
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// 清理上传的临时文件（质检成功后）
+function cleanupUploads(filePath, convertedPath) {
+  try {
+    if (filePath && fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+    if (convertedPath && convertedPath !== filePath && fs.existsSync(convertedPath)) {
+      fs.unlinkSync(convertedPath);
+    }
+  } catch (err) {
+    console.error("清理上传文件失败:", err.message);
+  }
+}
 
 const storage = multer.diskStorage({
   destination: path.join(__dirname, "uploads"),
@@ -91,6 +106,8 @@ app.post("/api/inspect", upload.single("audio"), async (req, res) => {
 
     statsManager.addInspection(result);
     sendNDJSON({ type: "complete", success: true, data: result });
+    // 质检成功后清理临时文件
+    cleanupUploads(req.file.path, result.convertedPath);
   } catch (err) {
     console.error("质检失败:", err);
     sendNDJSON({ type: "error", error: err.message });
@@ -124,6 +141,7 @@ app.post("/api/inspect/stream", upload.single("audio"), async (req, res) => {
 
     statsManager.addInspection(result);
     send("complete", { success: true, data: result });
+    cleanupUploads(req.file.path, result.convertedPath);
     res.end();
   } catch (err) {
     console.error("质检失败:", err);
@@ -148,6 +166,10 @@ app.post("/api/inspect/demo", async (req, res) => {
 
 app.get("/api/stats", (req, res) => {
   res.json(statsManager.getStats());
+});
+
+app.get("/api/token-usage", (req, res) => {
+  res.json(statsManager.getTokenStats());
 });
 
 app.get("/api/history", (req, res) => {
