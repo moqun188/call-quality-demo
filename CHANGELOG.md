@@ -9,9 +9,20 @@
 
 ### 已知问题
 - statsManager.avgDimensions NaN Bug（P0-001）
-- 4 次重复 API 调用（P0-002）
 - uploads 目录不清理（P0-003）
 - 日志无轮转（P0-004）
+
+---
+
+## [0.2.0] - 2026-06-17
+
+### 优化 (Changed)
+- **P0-002**: 合并 ASR + 说话人分离 + 情绪分析为单次多模态 API 调用
+  - 新增 `pipeline/multimodalAnalyzer.js`：使用 `mimo-v2.5-pro` 一次性完成 ASR/说话人/情绪
+  - 改造 `pipeline/index.js`：优先多模态单次调用，失败自动回退到各模块独立调用
+  - API 调用次数从 3 次 → 1 次（音频）+ 1 次（文本总结）= 总共 2 次
+  - 节省 60%+ Credits，质检耗时预计从 15-30 秒降至 3-8 秒
+  - 负责人: moqun188
 
 ---
 

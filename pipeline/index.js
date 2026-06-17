@@ -1,6 +1,8 @@
 /**
  * Pipeline 编排器
- * 串联预处理 → ASR → 说话人分离 → 情绪分析 → 质检分析
+ * 串联预处理 → 多模态分析（ASR+说话人+情绪）→ 质检分析
+ * 
+ * 优化: 优先使用单次多模态 API 调用，失败时回退到各模块独立调用
  */
 
 require("dotenv").config();
@@ -8,9 +10,11 @@ const AudioPreprocessor = require("./preprocessor");
 const ASREngine = require("./asr");
 const DiarizationEngine = require("./diarization");
 const EmotionAnalyzer = require("./emotion");
+const MultimodalAnalyzer = require("./multimodalAnalyzer");
 const QualityAnalyzer = require("./qualityAnalyzer");
 const Summarizer = require("./summarizer");
 const { getScenario } = require("./scenarios");
+const { logger } = require("./logger");
 
 class QualityInspectionPipeline {
   constructor(config = {}) {
@@ -18,6 +22,7 @@ class QualityInspectionPipeline {
     this.asr = new ASREngine({ mockMode: config.mockMode !== false });
     this.diarization = new DiarizationEngine({ mockMode: config.mockMode !== false });
     this.emotion = new EmotionAnalyzer({ mockMode: config.mockMode !== false });
+    this.multimodal = new MultimodalAnalyzer({ enableReal: config.mockMode === false });
     this.quality = new QualityAnalyzer();
     this.summarizer = new Summarizer();
     this.enableRealASR = process.env.ENABLE_REAL_ASR === "true";
@@ -52,29 +57,55 @@ class QualityInspectionPipeline {
     // Step 1: 预处理 + 统一格式转换（所有后续模块复用转换后的 mp3）
     await notify(0, "processing");
     const preprocResult = await this.preprocessor.process(audioPath);
-    const effectiveAudioPath = preprocResult.convertedPath || audioPath; // 关键：统一转换后的路径
+    const effectiveAudioPath = preprocResult.convertedPath || audioPath;
     await notify(0, "completed", `${preprocResult.sampleRate / 1000}kHz / ${preprocResult.channels}ch` +
       (preprocResult.convertedPath ? "（已转码，后续模块复用）" : ""));
 
-    // Step 2: ASR 转写
-    await notify(1, "processing");
-    const asrResult = await this.asr.transcribe(effectiveAudioPath);
-    if (this.asr.mockMode) {
-      const corrected = this.asr.applyHotwordCorrection(asrResult.segments);
-      asrResult.segments = corrected;
+    // Step 2-4: 优先尝试多模态单次调用（ASR + 说话人 + 情绪）
+    let emotionResult;
+    let usedMultimodal = false;
+
+    const multimodalResult = await this.multimodal.analyze(effectiveAudioPath);
+
+    if (multimodalResult) {
+      // 多模态调用成功！一次完成 ASR + 说话人 + 情绪
+      usedMultimodal = true;
+      logger.info(`[Pipeline] 使用多模态单次调用，节省 2 次 API 请求`);
+
+      // 更新步骤状态（一次性标记完成）
+      await notify(1, "completed", `多模态识别 ${multimodalResult.utterances.length} 句`);
+      await notify(2, "completed", `多模态说话人识别完成`);
+      await notify(3, "completed", multimodalResult.overall);
+
+      emotionResult = {
+        utterances: multimodalResult.utterances,
+        overall: multimodalResult.overall,
+        trend: multimodalResult.trend,
+      };
+    } else {
+      // 回退到各模块独立调用
+      logger.info("[Pipeline] 多模态调用未成功，回退到各模块独立调用");
+
+      // Step 2: ASR 转写
+      await notify(1, "processing");
+      const asrResult = await this.asr.transcribe(effectiveAudioPath);
+      if (this.asr.mockMode) {
+        const corrected = this.asr.applyHotwordCorrection(asrResult.segments);
+        asrResult.segments = corrected;
+      }
+      await notify(1, "completed", `识别 ${asrResult.segments.length} 句，${asrResult.duration.toFixed(1)}s`);
+
+      // Step 3: 说话人分离
+      await notify(2, "processing");
+      const diarResult = await this.diarization.diarize(effectiveAudioPath);
+      const utterances = this.diarization.align(asrResult.segments, diarResult.segments);
+      await notify(2, "completed", `检出 ${diarResult.numSpeakers} 人，${diarResult.segments.length} 段`);
+
+      // Step 4: 情绪分析
+      await notify(3, "processing");
+      emotionResult = await this.emotion.analyze(effectiveAudioPath, utterances);
+      await notify(3, "completed", emotionResult.overall);
     }
-    await notify(1, "completed", `识别 ${asrResult.segments.length} 句，${asrResult.duration.toFixed(1)}s`);
-
-    // Step 3: 说话人分离
-    await notify(2, "processing");
-    const diarResult = await this.diarization.diarize(effectiveAudioPath);
-    const utterances = this.diarization.align(asrResult.segments, diarResult.segments);
-    await notify(2, "completed", `检出 ${diarResult.numSpeakers} 人，${diarResult.segments.length} 段`);
-
-    // Step 4: 情绪分析
-    await notify(3, "processing");
-    const emotionResult = await this.emotion.analyze(effectiveAudioPath, utterances);
-    await notify(3, "completed", emotionResult.overall);
 
     // Step 5: 通话总结生成
     await notify(4, "processing");
@@ -97,6 +128,8 @@ class QualityInspectionPipeline {
       quality: qualityResult,
       summary: summaryResult,
       callSummary: this._generateCallSummary(summaryResult),
+      usedMultimodal,
+      apiCallCount: usedMultimodal ? 2 : 5, // 多模态: 1次音频+1次文本=2次; 传统: 3次音频+1次文本+1次预处理=5次
     };
   }
 
@@ -105,7 +138,7 @@ class QualityInspectionPipeline {
       "音频预处理",
       "语音转写 (ASR)",
       "说话人分离",
-      "语气语调分析",
+      "情绪分析",
       "通话总结生成",
       "质检评分",
     ];
