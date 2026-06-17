@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>录音质检系统 — 数据统计面板</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <div class="dashboard-container">
+    <header class="dash-header">
+      <div class="dash-header-left">
+        <a href="index.html" class="back-link">← 返回质检</a>
+        <h1>📊 质检统计面板</h1>
+      </div>
+      <button class="btn btn-secondary" id="refreshBtn">🔄 刷新</button>
+    </header>
+
+    <div class="kpi-row" id="kpiRow">
+      <div class="kpi-card">
+        <div class="kpi-value" id="kpiTotal">0</div>
+        <div class="kpi-label">总质检数</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value" id="kpiAvgScore">0</div>
+        <div class="kpi-label">平均分</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value" id="kpiARatio">0%</div>
+        <div class="kpi-label">A级占比</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value" id="kpiViolations">0</div>
+        <div class="kpi-label">违规总数</div>
+      </div>
+    </div>
+
+    <div class="charts-row">
+      <div class="chart-card">
+        <h3>等级分布</h3>
+        <div class="pie-chart" id="pieChart"></div>
+        <div class="pie-legend" id="pieLegend"></div>
+      </div>
+      <div class="chart-card">
+        <h3>各维度平均分</h3>
+        <div class="bar-chart" id="barChart"></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3>最近质检记录</h3>
+      <div class="table-wrap">
+        <table class="history-table" id="historyTable">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>时间</th>
+              <th>文件</th>
+              <th>分数</th>
+              <th>等级</th>
+              <th>情绪</th>
+              <th>违规</th>
+              <th>详情</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div>
+      <div class="empty-state" id="emptyState" hidden>暂无质检记录</div>
+    </div>
+
+    <div class="detail-panel" id="detailPanel" hidden>
+      <div class="detail-header">
+        <h3>质检详情 #<span id="detailId"></span></h3>
+        <div class="detail-actions">
+          <button class="btn btn-secondary btn-sm" id="exportObsidianBtn">📝 导出到 Obsidian</button>
+          <button class="btn btn-secondary btn-sm" id="closeDetail">✕ 关闭</button>
+        </div>
+      </div>
+      <div class="detail-body" id="detailBody"></div>
+    </div>
+  </div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>

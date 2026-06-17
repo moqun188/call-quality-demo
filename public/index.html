@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>录音质检系统 — MVP Demo</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="dark-mode.css">
+</head>
+<body>
+  <div class="loading-overlay" id="loadingOverlay" hidden>
+    <div class="spinner"></div>
+    <p class="loading-text">加载中...</p>
+  </div>
+
+  <div class="container">
+    <header>
+      <div class="header-top">
+        <div>
+          <h1>📞 录音质检系统</h1>
+          <p class="subtitle">Quality Inspection MVP · 基于 MiMo 模型架构</p>
+        </div>
+        <div class="header-right">
+          <a href="dashboard.html" class="btn btn-secondary stats-link">📊 查看统计</a>
+          <button class="btn btn-secondary theme-btn" id="themeToggle">🌙</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="upload-area" id="uploadArea">
+      <div class="upload-icon">🎤</div>
+      <h3>上传录音文件</h3>
+      <p class="upload-hint">支持 WAV / MP3 / M4A / OGG / AMR / FLAC，最大 50MB</p>
+      <button class="btn btn-primary" id="uploadBtn">选择文件</button>
+      <input type="file" id="fileInput" accept=".wav,.mp3,.m4a,.ogg,.amr,.flac" hidden>
+      <div class="divider"><span>或</span></div>
+      <div class="scenario-selector" id="scenarioSelector">
+        <p class="scenario-label">选择 Demo 场景：</p>
+        <div class="scenario-list" id="scenarioList"></div>
+      </div>
+      <div class="file-info" id="fileInfo" hidden></div>
+    </div>
+
+    <div class="pipeline" id="pipeline" hidden>
+      <h2>处理流程</h2>
+      <div class="steps" id="steps"></div>
+
+      <div class="progress-wrap">
+        <div class="progress-bar" id="progressBar">
+          <div class="progress-fill" id="progressFill">
+            <span class="progress-percent-inner" id="progressPercent">0%</span>
+          </div>
+        </div>
+        <span class="progress-percent-outer" id="progressPercentOuter">0%</span>
+      </div>
+      <div class="progress-status" id="progressStatus">准备中...</div>
+    </div>
+
+    <div class="results" id="results" hidden>
+      <div class="result-header">
+        <h2>质检报告</h2>
+        <div class="score-badge" id="scoreBadge">
+          <span class="score-value" id="scoreValue">0</span>
+          <span class="score-label">分</span>
+        </div>
+      </div>
+
+      <div class="summary-card" id="summaryCard"></div>
+
+      <div class="dimension-grid" id="dimensionGrid"></div>
+
+      <div class="section" id="waveformSection">
+        <div id="waveformContainer"></div>
+      </div>
+
+      <div class="section collapsible-section" id="transcriptSection">
+        <div class="section-header" data-target="transcriptContent">
+          <h3>📝 对话记录</h3>
+          <span class="collapse-icon">▾</span>
+        </div>
+        <div class="section-body" id="transcriptContent">
+          <div class="transcript-filters" id="transcriptFilters">
+            <button class="filter-btn active" data-filter="all">全部</button>
+            <button class="filter-btn" data-filter="agent">仅看客服</button>
+            <button class="filter-btn" data-filter="customer">仅看客户</button>
+          </div>
+          <div class="transcript" id="transcript"></div>
+        </div>
+      </div>
+
+      <div class="section collapsible-section" id="violationsSection">
+        <div class="section-header" data-target="violationsContent">
+          <h3>📊 违规记录</h3>
+          <span class="collapse-icon">▾</span>
+        </div>
+        <div class="section-body" id="violationsContent">
+          <div id="violations"></div>
+        </div>
+      </div>
+
+      <div class="section collapsible-section" id="suggestionsSection">
+        <div class="section-header" data-target="suggestionsContent">
+          <h3>💡 改进建议</h3>
+          <span class="collapse-icon">▾</span>
+        </div>
+        <div class="section-body" id="suggestionsContent">
+          <div id="suggestions"></div>
+        </div>
+      </div>
+
+      <div class="section collapsible-section" id="emotionSection">
+        <div class="section-header" data-target="emotionContent">
+          <h3>😊 情绪分析</h3>
+          <span class="collapse-icon">▾</span>
+        </div>
+        <div class="section-body" id="emotionContent">
+          <div class="emotion-chart" id="emotionChart"></div>
+        </div>
+      </div>
+
+      <div class="export-bar">
+        <button class="btn btn-export ripple-btn" id="exportExcelBtn">📥 导出 Excel</button>
+        <button class="btn btn-export ripple-btn" id="exportJsonBtn">📥 导出 JSON</button>
+      </div>
+
+      <button class="btn btn-primary ripple-btn" id="resetBtn">重新质检</button>
+    </div>
+
+    <footer class="site-footer">
+      <p>录音质检系统 MVP v1.2.0 · 开发者: Quality Team · 快捷键: <kbd>D</kbd> 切换深色模式 · <kbd>Esc</kbd> 关闭弹窗</p>
+    </footer>
+  </div>
+
+  <script src="waveform.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

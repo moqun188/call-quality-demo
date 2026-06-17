@@ -1,0 +1,219 @@
+/* ─── Dark Mode Variables ─── */
+body.dark-mode {
+  --bg-primary: #0f0f1a;
+  --bg-secondary: #1a1a2e;
+  --bg-card: #1e1e36;
+  --bg-card-hover: #252545;
+  --border-color: #2a2a4a;
+  --text-primary: #e8e8f0;
+  --text-secondary: #a0a0b8;
+  --text-muted: #6a6a88;
+  --accent: #667eea;
+  --accent-dim: rgba(102, 126, 234, 0.15);
+  --danger-bg: #2d1515;
+  --danger-text: #f87171;
+  --success-bg: #152d1a;
+  --success-text: #4ade80;
+  --warning-bg: #2d2515;
+  --warning-text: #fbbf24;
+  --info-bg: #15152d;
+  --info-text: #60a5fa;
+  --upload-bg: #1a1a2e;
+  --upload-border: #33335a;
+  --upload-hover-bg: #22224a;
+  --progress-bg: #2a2a4a;
+  --shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-mode {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+body.dark-mode .upload-area {
+  background: var(--bg-card);
+  border-color: var(--upload-border);
+}
+
+body.dark-mode .upload-area:hover {
+  background: var(--upload-hover-bg);
+  border-color: var(--accent);
+}
+
+body.dark-mode .upload-area.dragover {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+
+body.dark-mode .divider span {
+  background: var(--bg-card);
+}
+
+body.dark-mode .file-info {
+  background: var(--accent-dim);
+  color: var(--text-secondary);
+}
+
+body.dark-mode .btn-secondary {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+body.dark-mode .btn-secondary:hover {
+  background: var(--bg-card-hover);
+}
+
+body.dark-mode .step {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+}
+
+body.dark-mode .step.pending .step-icon {
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+}
+
+body.dark-mode .step.processing .step-icon {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+body.dark-mode .step.completed .step-icon {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+body.dark-mode .step.error .step-icon {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+body.dark-mode .progress-bar {
+  background: var(--progress-bg);
+}
+
+body.dark-mode .summary-card {
+  background: var(--accent-dim);
+  border-color: rgba(102, 126, 234, 0.3);
+}
+
+body.dark-mode .summary-card .highlights {
+  color: var(--text-secondary);
+}
+
+body.dark-mode .dimension-card {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+}
+
+body.dark-mode .dimension-card .dim-bar {
+  background: var(--bg-secondary);
+}
+
+body.dark-mode .section {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+}
+
+body.dark-mode .section h3 {
+  color: var(--text-primary);
+}
+
+body.dark-mode .transcript-item {
+  border-bottom-color: var(--border-color);
+}
+
+body.dark-mode .transcript-item:hover {
+  background: var(--accent-dim);
+}
+
+body.dark-mode .role-tag.agent {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+body.dark-mode .role-tag.customer {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+body.dark-mode .violation-item {
+  border-bottom-color: var(--danger-bg);
+}
+
+body.dark-mode .severity-tag.critical {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+body.dark-mode .severity-tag.major {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+body.dark-mode .severity-tag.minor {
+  background: var(--info-bg);
+  color: var(--info-text);
+}
+
+body.dark-mode .suggestion-item {
+  color: var(--text-secondary);
+}
+
+body.dark-mode .filter-btn {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border-color: var(--border-color);
+}
+
+body.dark-mode .filter-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+body.dark-mode .filter-btn:hover:not(.active) {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+body.dark-mode .empty-state {
+  color: var(--text-muted);
+}
+
+body.dark-mode .site-footer {
+  color: var(--text-muted);
+  border-color: var(--border-color);
+}
+
+body.dark-mode .site-footer kbd {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+body.dark-mode .theme-toggle {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+body.dark-mode .section-header:hover {
+  background: var(--accent-dim);
+}
+
+body.dark-mode .score-badge.level-A,
+body.dark-mode .score-badge.level-B {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+body.dark-mode .score-badge.level-C {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+body.dark-mode .score-badge.level-D,
+body.dark-mode .score-badge.level-E {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
