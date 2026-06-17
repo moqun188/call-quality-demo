@@ -109,7 +109,7 @@ class QualityInspectionPipeline {
 
     // Step 5: 通话总结生成
     await notify(4, "processing");
-    const summaryResult = await this.summarizer.summarize(utterances, emotionResult);
+    const summaryResult = await this.summarizer.summarize(emotionResult.utterances, emotionResult);
     await notify(4, "completed", summaryResult.callPurpose || "总结生成完成");
 
     // Step 6: 质检评分

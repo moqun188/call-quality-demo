@@ -17,7 +17,7 @@ class MultimodalAnalyzer {
   constructor(config = {}) {
     this.apiKey = process.env.MIMO_API_KEY;
     this.baseUrl = process.env.MIMO_BASE_URL || "https://api.xiaomimimo.com/v1";
-    this.modelName = process.env.ASR_MODEL || "mimo-v2.5-pro";
+    this.modelName = "mimo-v2.5";
     this.enableReal = config.enableReal !== false;
   }
 
