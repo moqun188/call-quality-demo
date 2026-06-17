@@ -12,6 +12,7 @@
     "@ffmpeg/core": "^0.12.10",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
+    "better-sqlite3": "^12.11.1",
     "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",
     "express": "^4.18.2",
