@@ -1,0 +1,57 @@
+{
+  "quality": {
+    "totalScore": 90,
+    "dimensions": {
+      "communication": {
+        "reason": "????",
+        "score": 8
+      },
+      "compliance": {
+        "reason": "?????",
+        "score": 9
+      },
+      "knowledge": {
+        "reason": "??????",
+        "score": 10
+      },
+      "process": {
+        "reason": "????",
+        "score": 9
+      }
+    },
+    "level": "A",
+    "suggestions": [
+      "????"
+    ],
+    "violations": []
+  },
+  "emotion": "????",
+  "timestamp": "2026-06-15T10:00:00Z",
+  "utterances": [
+    {
+      "start": 0,
+      "speaker": "speaker_0",
+      "end": 2,
+      "text": "??,????",
+      "role": "agent"
+    },
+    {
+      "start": 3,
+      "speaker": "speaker_1",
+      "end": 5,
+      "text": "??",
+      "role": "customer"
+    }
+  ],
+  "fileName": "????.wav",
+  "summary": {
+    "title": "A? - 90?",
+    "verdict": "??",
+    "emotionSummary": "????",
+    "highlights": [
+      "????",
+      "????"
+    ]
+  },
+  "totalTime": "48s"
+}
