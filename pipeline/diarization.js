@@ -213,9 +213,11 @@ class DiarizationEngine {
 
   /**
    * 将 ASR 句子与说话人标签对齐
+   * 自动检测客服/客户角色：说话人编号是任意的，不能硬编码 speaker_0 = agent
    */
   align(asrSegments, diarSegments) {
-    const utterances = [];
+    // 1. 先按说话人编号初步对齐
+    const rawUtterances = [];
     let diarIdx = 0;
 
     for (const asr of asrSegments) {
@@ -224,16 +226,70 @@ class DiarizationEngine {
         diarIdx++;
       }
       const speaker = diarSegments[Math.min(diarIdx, diarSegments.length - 1)].speaker;
-      utterances.push({
+      rawUtterances.push({
         speaker,
-        role: speaker === "speaker_0" ? "agent" : "customer",
         start: asr.start,
         end: asr.end,
         text: asr.text,
       });
     }
 
-    return utterances;
+    // 2. 检测各说话人的角色
+    const roleMap = this._detectRoles(rawUtterances);
+
+    // 3. 分配角色
+    return rawUtterances.map(u => ({
+      ...u,
+      role: roleMap[u.speaker] || "customer",
+    }));
+  }
+
+  /**
+   * 检测说话人角色
+   * 策略：
+   *   A) 第一个说话的默认为 agent（客服主动开场）
+   *   B) 用关键词校验，如果第一个说话人包含客户特征词则交换
+   */
+  _detectRoles(utterances) {
+    const speakers = [...new Set(utterances.map(u => u.speaker))];
+    if (speakers.length === 0) return {};
+
+    // 默认：第一个说话的 = agent
+    const firstSpeaker = utterances[0].speaker;
+    let roleMap = {};
+    for (const s of speakers) {
+      roleMap[s] = s === firstSpeaker ? "agent" : "customer";
+    }
+
+    // 关键词校验
+    const agentKeywords = /请问|欢迎致电|您好.*客服|帮您|为您|这边是|我帮您|您.*需要|工号/;
+    const customerKeywords = /我想|我要|咨询|投诉|怎么.*办|多少钱|怎么回事|退货|退款|我的订单|你们.*什么/;
+
+    const speakerTexts = {};
+    for (const u of utterances) {
+      if (!speakerTexts[u.speaker]) speakerTexts[u.speaker] = [];
+      speakerTexts[u.speaker].push(u.text);
+    }
+
+    const scores = {};
+    for (const s of speakers) {
+      const texts = speakerTexts[s].join("");
+      const agentHits = (texts.match(agentKeywords) || []).length;
+      const custHits = (texts.match(customerKeywords) || []).length;
+      scores[s] = { agentHits, custHits };
+    }
+
+    // 如果第一个说话人的客户关键词 > agent 关键词，说明角色反了，需要交换
+    const firstScores = scores[firstSpeaker];
+    if (firstScores && firstScores.custHits > firstScores.agentHits + 1) {
+      logger.info(`[说话人分离] 检测到角色反转: ${firstSpeaker} 客户特征更强，交换角色`);
+      for (const s of speakers) {
+        roleMap[s] = s === firstSpeaker ? "customer" : "agent";
+      }
+    }
+
+    logger.info(`[说话人分离] 角色映射: ${JSON.stringify(roleMap)}`);
+    return roleMap;
   }
 }
 
