@@ -305,8 +305,8 @@ app.post("/api/batch/inspect", upload.array("audio", 20), async (req, res) => {
           const result = await pipeline.run(item.filePath, item.fileName, null, () => {});
           statsManager.addInspection(result);
           batchQueue.updateItemStatus(batchId, item.itemId, "completed", {
-            totalScore: result.totalScore,
-            level: result.level,
+            totalScore: result.quality.totalScore,
+            level: result.quality.level,
           });
           cleanupUploads(item.filePath, result.convertedPath);
         } catch (err) {
