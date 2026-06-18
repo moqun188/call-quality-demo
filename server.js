@@ -11,8 +11,10 @@ const statsManager = require("./pipeline/statsManager");
 const { exportToObsidian, getVaultStats } = require("./pipeline/obsidianExporter");
 const { loadRules, listRules } = require("./pipeline/rulesLoader");
 const { generateEvolutionInsights } = require("./pipeline/selfEvolution");
+const BatchQueue = require("./pipeline/batchQueue");
 
 const app = express();
+const batchQueue = new BatchQueue();
 const PORT = process.env.PORT || 3000;
 
 // 清理上传的临时文件（质检成功后）
@@ -281,6 +283,76 @@ app.get("/api/rules/:name", (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// 批量质检 API
+const batchUpload = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = [".wav", ".mp3", ".m4a", ".ogg", ".amr", ".flac"];
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, allowed.includes(ext));
+  },
+});
+
+app.post("/api/batch/inspect", batchUpload.array("audio", 20), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: "请上传至少一个音频文件" });
+    }
+
+    const ruleName = req.body?.ruleName || "default";
+    const job = batchQueue.createJob(req.files);
+    const batchId = job.batchId;
+
+    // 异步逐个处理，不阻塞响应
+    (async () => {
+      for (const item of job.items) {
+        batchQueue.updateItemStatus(batchId, item.itemId, "processing");
+        try {
+          const pipeline = new QualityInspectionPipeline({ ruleName });
+          const result = await pipeline.run(item.filePath, item.fileName, null, (stepIndex, step) => {
+            // 进度回调（暂不推送）
+          });
+          statsManager.addInspection(result);
+          batchQueue.updateItemStatus(batchId, item.itemId, "completed", {
+            totalScore: result.totalScore,
+            level: result.level,
+          });
+          cleanupUploads(item.filePath, result.convertedPath);
+        } catch (err) {
+          console.error(`[Batch] ${item.fileName} 处理失败:`, err.message);
+          batchQueue.updateItemStatus(batchId, item.itemId, "failed", null, err.message);
+        }
+      }
+    })();
+
+    res.json({
+      success: true,
+      data: {
+        batchId,
+        total: job.total,
+        status: "running",
+      },
+    });
+  } catch (err) {
+    console.error("批量质检失败:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/batch/:batchId", (req, res) => {
+  const job = batchQueue.getJob(req.params.batchId);
+  if (!job) {
+    return res.status(404).json({ error: "批次不存在" });
+  }
+  res.json({ success: true, data: job });
+});
+
+app.get("/api/batch", (req, res) => {
+  const jobs = batchQueue.getAllJobs();
+  res.json({ success: true, data: jobs });
 });
 
 app.post("/api/test/asr", upload.single("audio"), async (req, res) => {
