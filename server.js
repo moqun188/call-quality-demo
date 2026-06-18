@@ -9,6 +9,7 @@ const { getScenarioList } = require("./pipeline/scenarios");
 const { exportToExcel, exportToJSON } = require("./pipeline/reportExporter");
 const statsManager = require("./pipeline/statsManager");
 const { exportToObsidian, getVaultStats } = require("./pipeline/obsidianExporter");
+const { loadRules, listRules } = require("./pipeline/rulesLoader");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -47,8 +48,6 @@ const upload = multer({
     }
   },
 });
-
-const pipeline = new QualityInspectionPipeline({ mockMode: false });
 
 function buildReportFileName(data, extension) {
   const rawBase = String(data.fileName || "质检报告").replace(/\.[^.\\/]+$/, "");
@@ -97,6 +96,8 @@ app.post("/api/inspect", upload.single("audio"), async (req, res) => {
   };
 
   const stepStart = Date.now();
+  const ruleName = req.body?.ruleName || req.query?.ruleName || "default";
+  const pipeline = new QualityInspectionPipeline({ ruleName });
 
   try {
     const result = await pipeline.run(req.file.path, req.file.originalname, null, async (stepIndex, step) => {
@@ -133,6 +134,8 @@ app.post("/api/inspect/stream", upload.single("audio"), async (req, res) => {
   };
 
   const stepStart = Date.now();
+  const ruleName = req.body?.ruleName || req.query?.ruleName || "default";
+  const pipeline = new QualityInspectionPipeline({ ruleName });
 
   try {
     const result = await pipeline.run(req.file.path, req.file.originalname, null, (stepIndex, step) => {
@@ -153,7 +156,9 @@ app.post("/api/inspect/stream", upload.single("audio"), async (req, res) => {
 app.post("/api/inspect/demo", async (req, res) => {
   try {
     const scenario = req.query.scenario || "A";
-    const result = await pipeline.run("demo", "demo_sample.wav", scenario);
+    const ruleName = req.body?.ruleName || req.query?.ruleName || "default";
+    const demoPipeline = new QualityInspectionPipeline({ mockMode: false, ruleName });
+    const result = await demoPipeline.run("demo", "demo_sample.wav", scenario);
     statsManager.addInspection(result);
     res.json({
       success: true,
@@ -241,6 +246,25 @@ app.get("/api/obsidian/stats", (req, res) => {
     });
   } catch (err) {
     console.error("获取Obsidian统计失败:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 规则管理 API
+app.get("/api/rules", (req, res) => {
+  try {
+    const rules = listRules();
+    res.json({ success: true, data: rules });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/rules/:name", (req, res) => {
+  try {
+    const rules = loadRules(req.params.name);
+    res.json({ success: true, data: rules });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

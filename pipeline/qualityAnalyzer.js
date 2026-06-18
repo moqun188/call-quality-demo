@@ -1,27 +1,19 @@
 /**
  * 质检分析引擎
  * 话术合规、业务知识、流程完整性、沟通技巧评估
+ * 规则从 rules/*.json 加载，支持多场景配置
  */
 
+const { loadRules } = require("./rulesLoader");
+
 class QualityAnalyzer {
-  constructor() {
-    this.standards = {
-      opening: ["您好", "欢迎致电", "请问有什么可以帮您"],
-      closing: ["感谢", "祝您", "再见", "生活愉快"],
-      polite: ["请", "谢谢", "您", "麻烦", "抱歉", "理解"],
-      prohibited: ["不知道", "不归我管", "没办法", "你自己", "不关我事"],
-      process: [
-        "开场问候",
-        "身份确认",
-        "需求了解",
-        "方案提供",
-        "问题解决",
-        "结束确认",
-      ],
-    };
+  constructor(ruleName) {
+    this.rules = loadRules(ruleName || "default");
+    this.standards = this.rules.standards;
   }
 
   async evaluate(utterances, emotionResult) {
+    const r = this.rules;
     const fullText = utterances.map((u) => u.text).join("");
     const agentTexts = utterances.filter((u) => u.role === "agent").map((u) => u.text);
     const customerTexts = utterances.filter((u) => u.role === "customer").map((u) => u.text);
@@ -32,35 +24,49 @@ class QualityAnalyzer {
     const communication = this._evalCommunication(utterances, emotionResult);
     const violations = this._detectViolations(agentTexts);
 
+    const w = r.weights;
     const weighted =
-      compliance.score * 0.30 +
-      knowledge.score * 0.25 +
-      process.score * 0.25 +
-      communication.score * 0.20;
+      compliance.score * w.compliance +
+      knowledge.score * w.knowledge +
+      process.score * w.process +
+      communication.score * w.communication;
 
-    const penalty = violations.filter((v) => v.severity === "critical").length * 5;
+    const penalties = r.penalties;
+    let penalty = 0;
+    for (const v of violations) {
+      penalty += penalties[v.severity] || 0;
+    }
     const total = Math.max(0, Math.min(100, Math.round(weighted * 10 - penalty)));
+
+    // 计算等级
+    let level = "E";
+    for (const [lv, threshold] of Object.entries(r.levels).sort((a, b) => b[1] - a[1])) {
+      if (total >= threshold) { level = lv; break; }
+    }
 
     return {
       totalScore: total,
-      level: total >= 90 ? "A" : total >= 80 ? "B" : total >= 70 ? "C" : total >= 60 ? "D" : "E",
+      level,
       dimensions: { compliance, knowledge, process, communication },
       violations,
       strengths: this._findStrengths(agentTexts),
       suggestions: this._generateSuggestions(compliance, knowledge, process, communication),
+      ruleName: r.name,
+      ruleVersion: r.version,
     };
   }
 
   _evalCompliance(agentTexts, fullText) {
-    let score = 7;
+    const cfg = this.rules.dimensions.compliance;
+    let score = cfg.baseScore;
 
     const hasOpening = this.standards.opening.some((p) => fullText.includes(p));
     const hasClosing = this.standards.closing.some((p) => fullText.includes(p));
     const politeCount = this.standards.polite.filter((p) => fullText.includes(p)).length;
 
-    if (hasOpening) score += 1;
-    if (hasClosing) score += 1;
-    if (politeCount >= 4) score += 1;
+    if (hasOpening) score += cfg.checks.opening.points;
+    if (hasClosing) score += cfg.checks.closing.points;
+    if (politeCount >= cfg.checks.politeThreshold.value) score += cfg.checks.politeThreshold.points;
 
     return {
       score: Math.min(10, score),
@@ -76,39 +82,39 @@ class QualityAnalyzer {
   }
 
   _evalKnowledge(agentTexts, customerTexts) {
-    let score = 7;
+    const cfg = this.rules.dimensions.knowledge;
+    let score = cfg.baseScore;
 
-    const customerQuestions = customerTexts.filter((t) => t.includes("?") || t.includes("？") || t.includes("怎么") || t.includes("如何") || t.includes("吗"));
-    const customerConcerns = customerTexts.filter((t) => t.includes("不合适") || t.includes("偏小") || t.includes("运费") || t.includes("退货"));
-
+    const customerConcerns = customerTexts.filter((t) =>
+      cfg.concernKeywords.some((k) => t.includes(k))
+    );
     if (customerConcerns.length > 0) score += 1;
-    if (agentTexts.some((t) => t.includes("码数") || t.includes("退货") || t.includes("运费"))) score += 1;
-
-    const hasCorrective = agentTexts.some((t) => t.includes("7天") || t.includes("退货期") || t.includes("24小时"));
-    if (hasCorrective) score += 1;
+    if (agentTexts.some((t) => cfg.answerKeywords.some((k) => t.includes(k)))) score += 1;
+    if (agentTexts.some((t) => cfg.correctiveKeywords.some((k) => t.includes(k)))) score += 1;
 
     return {
       score: Math.min(10, score),
-      reason: "准确回答退货流程和运费问题，知识点掌握良好",
+      reason: "准确回答客户问题，知识点掌握良好",
       evidence: [
         `客户提出 ${customerConcerns.length} 个核心关切`,
-        "准确说明退货期限 (7天)",
-        "明确运费承担方和退款时效 (24小时)",
+        agentTexts.some((t) => cfg.correctiveKeywords.some((k) => t.includes(k)))
+          ? "准确说明了关键业务信息"
+          : "未检测到关键业务信息回复",
       ],
     };
   }
 
   _evalProcess(utterances) {
-    let score = 6;
+    const cfg = this.rules.dimensions.process;
+    let score = cfg.baseScore;
     const fullText = utterances.map((u) => u.text).join("");
 
-    const stages = {
-      opening: this.standards.opening.some((p) => fullText.includes(p)),
-      infoRequest: utterances.some((u) => u.text.includes("订单号") || u.text.includes("提供")),
-      problemIdentified: utterances.some((u) => u.text.includes("不合适") || u.text.includes("退货")),
-      solution: utterances.some((u) => u.text.includes("提交") || u.text.includes("申请") || u.text.includes("寄回")),
-      closing: this.standards.closing.some((p) => fullText.includes(p)),
-    };
+    const stages = {};
+    for (const [stageName, stageCfg] of Object.entries(cfg.stages)) {
+      const keywords = stageCfg.keywords || this.standards[stageName] || [];
+      stages[stageName] = keywords.some((k) => fullText.includes(k)) ||
+        utterances.some((u) => keywords.some((k) => u.text.includes(k)));
+    }
 
     const completed = Object.values(stages).filter(Boolean).length;
     score += completed;
@@ -116,18 +122,19 @@ class QualityAnalyzer {
     return {
       score: Math.min(10, score),
       stages,
-      completeness: `${completed}/5 环节完成`,
+      completeness: `${completed}/${Object.keys(stages).length} 环节完成`,
       reason: completed >= 4 ? "服务流程完整" : "部分流程环节缺失",
     };
   }
 
   _evalCommunication(utterances, emotionResult) {
-    let score = 7;
+    const cfg = this.rules.dimensions.communication;
+    let score = cfg.baseScore;
     const agentUtterances = utterances.filter((u) => u.role === "agent");
 
-    const hasConfirm = agentUtterances.some((u) => u.text.includes("理解") || u.text.includes("查到") || u.text.includes("请问"));
-    const hasEmpathy = agentUtterances.some((u) => u.text.includes("理解") || u.text.includes("麻烦"));
-    const hasGuide = agentUtterances.some((u) => u.text.includes("可以") || u.text.includes("联系") || u.text.includes("发到"));
+    const hasConfirm = agentUtterances.some((u) => cfg.confirmKeywords.some((k) => u.text.includes(k)));
+    const hasEmpathy = agentUtterances.some((u) => cfg.empathyKeywords.some((k) => u.text.includes(k)));
+    const hasGuide = agentUtterances.some((u) => cfg.guideKeywords.some((k) => u.text.includes(k)));
 
     if (hasConfirm) score += 1;
     if (hasEmpathy) score += 1;
@@ -137,7 +144,7 @@ class QualityAnalyzer {
       score: Math.min(10, score),
       reason: "客服有共情表达，能主动引导客户",
       evidence: [
-        hasEmpathy ? "表达了同理心 ('完全理解')" : "缺乏同理心表达",
+        hasEmpathy ? "表达了同理心" : "缺乏同理心表达",
         hasGuide ? "主动提供后续步骤指引" : "未主动引导客户",
         emotionResult?.trend?.resolved ? "客户问题得到解决" : "客户情绪未改善",
       ],
@@ -158,12 +165,12 @@ class QualityAnalyzer {
       }
     }
 
-    if (!agentTexts.some((t) => t.includes("请问") || t.includes("吗"))) {
-      violations.push({
-        type: "process_error",
-        detail: "未进行需求确认",
-        severity: "major",
-      });
+    const vCfg = this.rules.violations;
+    if (vCfg.noNeedConfirm) {
+      const nc = vCfg.noNeedConfirm;
+      if (!agentTexts.some((t) => nc.checkKeywords.some((k) => t.includes(k)))) {
+        violations.push({ type: nc.type, detail: nc.detail, severity: nc.severity });
+      }
     }
 
     return violations;
@@ -171,24 +178,26 @@ class QualityAnalyzer {
 
   _findStrengths(agentTexts) {
     const strengths = [];
-    if (agentTexts.some((t) => t.includes("理解"))) strengths.push("共情能力好");
-    if (agentTexts.some((t) => t.includes("请"))) strengths.push("礼貌用语规范");
-    if (agentTexts.some((t) => t.includes("运费") && t.includes("承担"))) strengths.push("主动说明费用承担");
+    for (const [, cfg] of Object.entries(this.rules.strengths)) {
+      if (agentTexts.some((t) => cfg.keywords.some((k) => t.includes(k)))) {
+        strengths.push(cfg.label);
+      }
+    }
     return strengths.length ? strengths : ["基础服务流程完整"];
   }
 
   _generateSuggestions(compliance, knowledge, process, communication) {
     const suggestions = [];
-    if (compliance.score < 8) suggestions.push("加强开场白和结束语的标准话术培训");
-    if (knowledge.score < 8) suggestions.push("建议补充产品知识库，提高应答准确率");
-    if (process.score < 8) suggestions.push("注意服务流程的完整性，增加确认环节");
-    if (communication.score < 8) suggestions.push("提升共情表达，主动引导客户情绪");
-
+    for (const [dim, score] of Object.entries({ compliance, knowledge, process, communication })) {
+      const cfg = this.rules.suggestions[dim];
+      if (cfg && score.score < cfg.threshold) {
+        suggestions.push(cfg.message);
+      }
+    }
     if (suggestions.length === 0) {
       suggestions.push("服务水平良好，建议保持");
       suggestions.push("可作为优秀案例供团队参考");
     }
-
     return suggestions;
   }
 }
