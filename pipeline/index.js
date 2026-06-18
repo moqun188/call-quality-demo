@@ -22,7 +22,7 @@ class QualityInspectionPipeline {
     this.asr = new ASREngine({ mockMode: config.mockMode !== false });
     this.diarization = new DiarizationEngine({ mockMode: config.mockMode !== false });
     this.emotion = new EmotionAnalyzer({ mockMode: config.mockMode !== false });
-    this.multimodal = new MultimodalAnalyzer({ enableReal: config.mockMode === false });
+    this.multimodal = new MultimodalAnalyzer({ enableReal: process.env.ENABLE_REAL_ASR === "true" });
     this.quality = new QualityAnalyzer(config.ruleName);
     this.summarizer = new Summarizer();
     this.enableRealASR = process.env.ENABLE_REAL_ASR === "true";
