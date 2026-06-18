@@ -4,7 +4,7 @@ const prettier = require("eslint-config-prettier");
 
 module.exports = [
   {
-    ignores: ["node_modules/**", "public/**", "data/**", "uploads/**", "logs/**", "cache/**", "obsidian-vault/**"],
+    ignores: ["node_modules/**", "public/**", "data/**", "uploads/**", "logs/**", "cache/**", "obsidian-vault/**", "coverage/**"],
   },
   js.configs.recommended,
   prettier,
@@ -15,6 +15,7 @@ module.exports = [
       sourceType: "commonjs",
       globals: {
         ...globals.node,
+        ...globals.jest,
       },
     },
     rules: {
