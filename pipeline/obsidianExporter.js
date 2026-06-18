@@ -16,7 +16,7 @@ function formatDate(dateStr) {
 }
 
 function formatTime(sec) {
-  if (sec == null) return "";
+  if (sec === null || sec === undefined) return "";
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
   return m > 0 ? `${m}:${s.toString().padStart(2, "0")}` : `${s}s`;
@@ -52,7 +52,7 @@ function generateNoteContent(data) {
   const dims = q.dimensions;
   const summary = data.callSummary || data.summary;
 
-  let content = `---
+  const content = `---
 aliases:
 tags: [质检报告, 客服质检, ${q.level}级]
 date: ${formatDate(data.timestamp)}

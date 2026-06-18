@@ -346,7 +346,7 @@ app.post("/api/test/asr", upload.single("audio"), async (req, res) => {
       success: response.ok,
       status: response.status,
       responseTime: `${responseTime}ms`,
-      apiKeyConfigured: !!apiKey,
+      apiKeyConfigured: Boolean(apiKey),
       model: modelName,
       fileSize: audioBuffer.length,
       mimeType: mimeType,

@@ -94,7 +94,9 @@ ${textContent}
       // 尝试从文本中抽取 JSON 片段
       const m = cleaned.match(/\{[\s\S]*\}/);
       if (m) {
-        try { data = JSON.parse(m[0]); } catch (e2) {}
+        try { data = JSON.parse(m[0]); } catch (e2) {
+          // ignore parse fallback error
+        }
       }
     }
 

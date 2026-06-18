@@ -195,7 +195,9 @@ class DiarizationEngine {
         // mp3 @ 64kbps ≈ 8KB/s，粗估时长
         durationSec = Math.max(10, Math.round(stat.size / 8000));
       }
-    } catch (e) {}
+    } catch (e) {
+      // ignore stat errors
+    }
 
     const numSegments = Math.max(4, Math.round(durationSec / 6));
     const segLen = durationSec / numSegments;
@@ -276,7 +278,7 @@ class DiarizationEngine {
     }
 
     // 根据得分分配角色：客服得分最高的 → agent，另一个 → customer
-    let roleMap = {};
+    const roleMap = {};
     if (speakers.length === 1) {
       roleMap[speakers[0]] = "agent";
     } else {
