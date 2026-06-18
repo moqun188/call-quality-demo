@@ -10,6 +10,7 @@ const { exportToExcel, exportToJSON } = require("./pipeline/reportExporter");
 const statsManager = require("./pipeline/statsManager");
 const { exportToObsidian, getVaultStats } = require("./pipeline/obsidianExporter");
 const { loadRules, listRules } = require("./pipeline/rulesLoader");
+const { generateEvolutionInsights } = require("./pipeline/selfEvolution");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -246,6 +247,19 @@ app.get("/api/obsidian/stats", (req, res) => {
     });
   } catch (err) {
     console.error("获取Obsidian统计失败:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 自我进化 API
+app.get("/api/evolution", (req, res) => {
+  try {
+    const db = require("./pipeline/database").getDb();
+    const insights = generateEvolutionInsights(db);
+    db.close();
+    res.json({ success: true, data: insights });
+  } catch (err) {
+    console.error("自我进化分析失败:", err);
     res.status(500).json({ error: err.message });
   }
 });

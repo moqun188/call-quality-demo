@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>更新日志 — 录音质检系统</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="dashboard.css">
+  <style>
+    .changelog { max-width: 800px; margin: 0 auto; }
+    .release { margin-bottom: 32px; border-left: 4px solid #3b82f6; padding-left: 20px; }
+    .release.current { border-left-color: #22c55e; }
+    .release-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+    .release-version { font-size: 20px; font-weight: 700; color: #1e293b; }
+    .release-date { font-size: 13px; color: #94a3b8; }
+    .release-tag { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+    .tag-current { background: #dcfce7; color: #166534; }
+    .tag-earlier { background: #f1f5f9; color: #475569; }
+    .release-title { font-size: 15px; font-weight: 600; color: #334155; margin-bottom: 8px; }
+    .change-list { list-style: none; padding: 0; }
+    .change-list li { padding: 4px 0; font-size: 14px; color: #475569; display: flex; align-items: flex-start; gap: 8px; }
+    .change-type { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 3px; flex-shrink: 0; margin-top: 2px; }
+    .type-feat { background: #dbeafe; color: #1e40af; }
+    .type-fix { background: #fef9c3; color: #a16207; }
+    .type-perf { background: #dcfce7; color: #166534; }
+    .type-refactor { background: #f3e8ff; color: #7c3aed; }
+    .type-breaking { background: #fee2e2; color: #dc2626; }
+    .back-link { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 24px; font-size: 14px; color: #3b82f6; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/" class="back-link">← 返回首页</a>
+    <h1>📋 更新日志</h1>
+    <p style="color:#64748b; margin-bottom:32px;">录音质检系统版本更新记录</p>
+
+    <div class="changelog">
+      <div class="release current">
+        <div class="release-header">
+          <span class="release-version">v0.4.0</span>
+          <span class="release-tag tag-current">当前版本</span>
+          <span class="release-date">2026-06-18</span>
+        </div>
+        <div class="release-title">自我进化 + What's New</div>
+        <ul class="change-list">
+          <li><span class="change-type type-feat">feat</span> 自我进化引擎 — 基于历史数据自动分析趋势、发现规则盲区、生成优化建议</li>
+          <li><span class="change-type type-feat">feat</span> What's New 页面 — 系统更新日志展示</li>
+          <li><span class="change-type type-feat">feat</span> API /api/evolution — 自我进化洞察接口</li>
+        </ul>
+      </div>
+
+      <div class="release">
+        <div class="release-header">
+          <span class="release-version">v0.3.1</span>
+          <span class="release-tag tag-earlier">历史版本</span>
+          <span class="release-date">2026-06-18</span>
+        </div>
+        <div class="release-title">质检规则可配置化 + Obsidian 知识库</div>
+        <ul class="change-list">
+          <li><span class="change-type type-feat">feat</span> rules/default.json 外部规则配置，支持多场景</li>
+          <li><span class="change-type type-feat">feat</span> pipeline/rulesLoader.js 规则加载器（支持引用解析）</li>
+          <li><span class="change-type type-feat">feat</span> Obsidian 质检仪表盘自动汇总、wikilinks 内链</li>
+          <li><span class="change-type type-feat">feat</span> API /api/rules 规则管理端点</li>
+          <li><span class="change-type type-refactor">refactor</span> qualityAnalyzer.js 从硬编码改为读取外部规则</li>
+          <li><span class="change-type type-refactor">refactor</span> 移除全局 pipeline 实例，改为按请求创建</li>
+        </ul>
+      </div>
+
+      <div class="release">
+        <div class="release-header">
+          <span class="release-version">v0.3.0</span>
+          <span class="release-tag tag-earlier">历史版本</span>
+          <span class="release-date">2026-06-17</span>
+        </div>
+        <div class="release-title">SQLite + Jest + ESLint</div>
+        <ul class="change-list">
+          <li><span class="change-type type-feat">feat</span> better-sqlite3 替换 JSON 文件存储，WAL 模式</li>
+          <li><span class="change-type type-feat">feat</span> Jest 测试框架 — 3 套件 18 测试全通过</li>
+          <li><span class="change-type type-feat">feat</span> ESLint + Prettier 代码规范（0 errors）</li>
+          <li><span class="change-type type-perf">perf</span> 自动迁移 JSON 数据到 SQLite 并备份</li>
+        </ul>
+      </div>
+
+      <div class="release">
+        <div class="release-header">
+          <span class="release-version">v0.2.0</span>
+          <span class="release-tag tag-earlier">历史版本</span>
+          <span class="release-date">2026-06-17</span>
+        </div>
+        <div class="release-title">P0 紧急修复 + 性能优化</div>
+        <ul class="change-list">
+          <li><span class="change-type type-fix">fix</span> P0-001: statsManager NaN Bug 修复</li>
+          <li><span class="change-type type-perf">perf</span> P0-002: 合并 ASR+说话人+情绪为单次多模态 API（3次→1次，省60%+）</li>
+          <li><span class="change-type type-fix">fix</span> P0-003: uploads 质检成功后自动清理</li>
+          <li><span class="change-type type-fix">fix</span> P0-004: 日志轮转 10MB + sessionId + 7天自动清理</li>
+          <li><span class="change-type type-feat">feat</span> Token 用量统计页面 /token-usage.html</li>
+        </ul>
+      </div>
+
+      <div class="release">
+        <div class="release-header">
+          <span class="release-version">v0.1.2</span>
+          <span class="release-tag tag-earlier">历史版本</span>
+          <span class="release-date">2026-06-17</span>
+        </div>
+        <div class="release-title">说话人角色检测修复</div>
+        <ul class="change-list">
+          <li><span class="change-type type-fix">fix</span> BUG-005: 客服/客户角色标注反转 — 双说话人关键词得分比较</li>
+        </ul>
+      </div>
+
+      <div class="release">
+        <div class="release-header">
+          <span class="release-version">v0.1.0</span>
+          <span class="release-tag tag-earlier">历史版本</span>
+          <span class="release-date">2026-06-17</span>
+        </div>
+        <div class="release-title">系统 MVP 初始版本</div>
+        <ul class="change-list">
+          <li><span class="change-type type-feat">feat</span> ASR + 说话人分离 + 情绪分析 + 质检评分</li>
+          <li><span class="change-type type-feat">feat</span> 小米 MiMo API 集成（mimo-v2.5-pro）</li>
+          <li><span class="change-type type-feat">feat</span> 前端界面 + Demo 模式 + 多格式导出</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
