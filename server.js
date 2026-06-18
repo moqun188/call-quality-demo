@@ -285,18 +285,8 @@ app.get("/api/rules/:name", (req, res) => {
   }
 });
 
-// 批量质检 API
-const batchUpload = multer({
-  storage,
-  limits: { fileSize: 50 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    const allowed = [".wav", ".mp3", ".m4a", ".ogg", ".amr", ".flac"];
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, allowed.includes(ext));
-  },
-});
-
-app.post("/api/batch/inspect", batchUpload.array("audio", 20), async (req, res) => {
+// 批量质检 API — 复用已有的 upload 实例
+app.post("/api/batch/inspect", upload.array("audio", 20), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: "请上传至少一个音频文件" });
@@ -312,9 +302,7 @@ app.post("/api/batch/inspect", batchUpload.array("audio", 20), async (req, res) 
         batchQueue.updateItemStatus(batchId, item.itemId, "processing");
         try {
           const pipeline = new QualityInspectionPipeline({ ruleName });
-          const result = await pipeline.run(item.filePath, item.fileName, null, (stepIndex, step) => {
-            // 进度回调（暂不推送）
-          });
+          const result = await pipeline.run(item.filePath, item.fileName, null, () => {});
           statsManager.addInspection(result);
           batchQueue.updateItemStatus(batchId, item.itemId, "completed", {
             totalScore: result.totalScore,
