@@ -1,190 +1,30 @@
-const scenarios = {
-  A: {
-    id: "A",
-    name: "投诉处理",
-    description: "客户愤怒→客服安抚→问题解决",
-    icon: "🔥",
-    asr_segments: [
-      { id: 0, start: 0.0, end: 2.5, text: "您好，欢迎致电XX客服中心，请问有什么可以帮您？" },
-      { id: 1, start: 3.0, end: 6.8, text: "你们这是什么破服务！我等了三天都没人理我！" },
-      { id: 2, start: 7.2, end: 10.5, text: "非常抱歉给您带来不好的体验，请问是遇到了什么问题呢？" },
-      { id: 3, start: 11.0, end: 15.2, text: "我之前报修的那个空调到现在还没人来修，打了三次电话了！" },
-      { id: 4, start: 15.8, end: 19.5, text: "理解您的着急，这件事确实是我们做得不到位。我马上帮您查一下维修进度。" },
-      { id: 5, start: 20.0, end: 22.0, text: "你查吧，我看你们能查出什么。" },
-      { id: 6, start: 22.5, end: 28.0, text: "查到了，您的工单号是WX20240620035，已经分配给维修师傅张师傅，预计明天上午上门。" },
-      { id: 7, start: 28.5, end: 30.0, text: "明天上午？那我今天怎么办？" },
-      { id: 8, start: 30.5, end: 35.0, text: "这样，我现在就联系张师傅，争取今天下午就帮您上门维修，您看可以吗？" },
-      { id: 9, start: 35.5, end: 37.0, text: "那还差不多。" },
-      { id: 10, start: 37.5, end: 42.0, text: "已经联系上了，张师傅今天下午三点到您家，我稍后把他的联系电话发到您手机上。" },
-      { id: 11, start: 42.5, end: 44.0, text: "行，这次处理得还不错。" },
-      { id: 12, start: 44.5, end: 48.0, text: "再次为之前的疏忽道歉，感谢您的耐心。祝您生活愉快，再见！" },
-    ],
-    diarization_segments: [
-      { speaker: "speaker_0", start: 0.0, end: 2.5 },
-      { speaker: "speaker_1", start: 3.0, end: 6.8 },
-      { speaker: "speaker_0", start: 7.2, end: 10.5 },
-      { speaker: "speaker_1", start: 11.0, end: 15.2 },
-      { speaker: "speaker_0", start: 15.8, end: 19.5 },
-      { speaker: "speaker_1", start: 20.0, end: 22.0 },
-      { speaker: "speaker_0", start: 22.5, end: 28.0 },
-      { speaker: "speaker_1", start: 28.5, end: 30.0 },
-      { speaker: "speaker_0", start: 30.5, end: 35.0 },
-      { speaker: "speaker_1", start: 35.5, end: 37.0 },
-      { speaker: "speaker_0", start: 37.5, end: 42.0 },
-      { speaker: "speaker_1", start: 42.5, end: 44.0 },
-      { speaker: "speaker_0", start: 44.5, end: 48.0 },
-    ],
-    emotion_data: {
-      agent: ["平静", "平静", "平静", "平静", "平静", "平静", "平静", "平静", "平静", "平静", "平静"],
-      customer: ["愤怒", "愤怒", "愤怒", "不满", "焦急", "平静", "不满", "平静", "平静"],
-      overall: "客户从愤怒逐步转为平静，客服有效安抚了客户情绪",
-      trend: {
-        customerStart: "愤怒",
-        customerEnd: "平静",
-        negativeShiftCount: 3,
-        resolved: true,
-      },
-    },
-    quality_result: {
-      totalScore: 88,
-      level: "B",
-      dimensions: {
-        compliance: { score: 9, reason: "开场白和结束语规范，道歉话术得体" },
-        knowledge: { score: 8, reason: "准确查询工单状态，提供明确解决方案" },
-        process: { score: 9, reason: "服务流程完整，从安抚到解决环环相扣" },
-        communication: { score: 9, reason: "共情能力强，主动提出加速解决方案" },
-      },
-      violations: [],
-      suggestions: ["建议加强首次报修响应速度，避免客户多次来电"],
-    },
-  },
+/**
+ * 场景加载器
+ * 从 scenarios/*.json 加载 Demo 场景数据
+ */
 
-  B: {
-    id: "B",
-    name: "产品咨询",
-    description: "正常咨询→专业解答→满意",
-    icon: "💬",
-    asr_segments: [
-      { id: 0, start: 0.0, end: 2.8, text: "您好，欢迎致电XX商城客服中心，请问有什么可以帮您？" },
-      { id: 1, start: 3.2, end: 6.5, text: "你好，我想了解一下你们新出的那款智能手表有什么功能？" },
-      { id: 2, start: 7.0, end: 11.5, text: "好的，这款手表支持心率监测、血氧检测、睡眠分析，还有多种运动模式。" },
-      { id: 3, start: 12.0, end: 14.2, text: "那电池续航怎么样？" },
-      { id: 4, start: 14.8, end: 19.0, text: "正常使用情况下续航约7天，开启GPS运动模式可以使用约20小时。" },
-      { id: 5, start: 19.5, end: 21.5, text: "支持防水吗？" },
-      { id: 6, start: 22.0, end: 25.5, text: "支持5ATM防水，日常洗手、淋雨都没问题，也可以戴着游泳。" },
-      { id: 7, start: 26.0, end: 28.5, text: "好的，那价格是多少呢？" },
-      { id: 8, start: 29.0, end: 33.5, text: "标准版899元，Pro版1299元。现在下单还有满减优惠，具体可以看我们的商城页面。" },
-      { id: 9, start: 34.0, end: 36.0, text: "听起来不错，我去看看。" },
-      { id: 10, start: 36.5, end: 40.0, text: "好的，如果还有其他问题随时联系我们。祝您生活愉快，再见！" },
-      { id: 11, start: 40.5, end: 41.5, text: "好的，谢谢，再见。" },
-      { id: 12, start: 42.0, end: 43.5, text: "感谢您的来电，祝您生活愉快，再见！" },
-    ],
-    diarization_segments: [
-      { speaker: "speaker_0", start: 0.0, end: 2.8 },
-      { speaker: "speaker_1", start: 3.2, end: 6.5 },
-      { speaker: "speaker_0", start: 7.0, end: 11.5 },
-      { speaker: "speaker_1", start: 12.0, end: 14.2 },
-      { speaker: "speaker_0", start: 14.8, end: 19.0 },
-      { speaker: "speaker_1", start: 19.5, end: 21.5 },
-      { speaker: "speaker_0", start: 22.0, end: 25.5 },
-      { speaker: "speaker_1", start: 26.0, end: 28.5 },
-      { speaker: "speaker_0", start: 29.0, end: 33.5 },
-      { speaker: "speaker_1", start: 34.0, end: 36.0 },
-      { speaker: "speaker_0", start: 36.5, end: 40.0 },
-      { speaker: "speaker_1", start: 40.5, end: 41.5 },
-      { speaker: "speaker_0", start: 42.0, end: 43.5 },
-    ],
-    emotion_data: {
-      agent: ["平静", "平静", "平静", "平静", "平静", "平静", "平静", "平静", "平静"],
-      customer: ["平静", "平静", "平静", "平静", "平静", "平静", "愉悦"],
-      overall: "全程情绪平稳，客户咨询后满意",
-      trend: {
-        customerStart: "平静",
-        customerEnd: "愉悦",
-        negativeShiftCount: 0,
-        resolved: true,
-      },
-    },
-    quality_result: {
-      totalScore: 92,
-      level: "A",
-      dimensions: {
-        compliance: { score: 9, reason: "标准开场白和结束语，礼貌用语使用充分" },
-        knowledge: { score: 10, reason: "对产品功能、续航、防水、价格等信息掌握全面准确" },
-        process: { score: 10, reason: "咨询引导流畅，逐步解答客户疑问" },
-        communication: { score: 8, reason: "应答专业，但可增加更多个性化推荐" },
-      },
-      violations: [],
-      suggestions: ["可主动推荐适合客户的产品型号，提升销售转化"],
-    },
-  },
+const fs = require("fs");
+const path = require("path");
 
-  C: {
-    id: "C",
-    name: "退款纠纷",
-    description: "客户不满→推诿→升级→解决",
-    icon: "⚠️",
-    asr_segments: [
-      { id: 0, start: 0.0, end: 2.8, text: "您好，欢迎致电XX客服中心，请问有什么可以帮您？" },
-      { id: 1, start: 3.2, end: 7.0, text: "我要退款！你们发过来的东西和图片完全不一样！" },
-      { id: 2, start: 7.5, end: 10.0, text: "您好，请问您是说收到的商品和页面描述不符吗？" },
-      { id: 3, start: 10.5, end: 14.5, text: "对！我要退货退款，你们这个是虚假宣传！" },
-      { id: 4, start: 15.0, end: 19.0, text: "理解您的不满，这个问题需要联系商家那边处理，我帮您转接好吗？" },
-      { id: 5, start: 19.5, end: 22.0, text: "每次都让我转接！上次转了三次都没人管！" },
-      { id: 6, start: 22.5, end: 27.0, text: "非常抱歉之前没有帮您处理好，这次我直接帮您发起退款申请，不需要转接了。" },
-      { id: 7, start: 27.5, end: 29.0, text: "真的吗？你确定能处理？" },
-      { id: 8, start: 29.5, end: 34.0, text: "是的，我已经提交了退款申请，预计3个工作日内到账。同时我给您一张20元优惠券作为补偿。" },
-      { id: 9, start: 34.5, end: 36.0, text: "那好吧，你把退款进度发我。" },
-      { id: 10, start: 36.5, end: 40.0, text: "好的，退款申请编号是TK20240620001，稍后会短信发给您，请注意查收。" },
-      { id: 11, start: 40.5, end: 42.5, text: "行，这次处理得还算满意。" },
-      { id: 12, start: 43.0, end: 46.5, text: "再次为之前的服务失误道歉，感谢您的理解。祝您生活愉快，再见！" },
-    ],
-    diarization_segments: [
-      { speaker: "speaker_0", start: 0.0, end: 2.8 },
-      { speaker: "speaker_1", start: 3.2, end: 7.0 },
-      { speaker: "speaker_0", start: 7.5, end: 10.0 },
-      { speaker: "speaker_1", start: 10.5, end: 14.5 },
-      { speaker: "speaker_0", start: 15.0, end: 19.0 },
-      { speaker: "speaker_1", start: 19.5, end: 22.0 },
-      { speaker: "speaker_0", start: 22.5, end: 27.0 },
-      { speaker: "speaker_1", start: 27.5, end: 29.0 },
-      { speaker: "speaker_0", start: 29.5, end: 34.0 },
-      { speaker: "speaker_1", start: 34.5, end: 36.0 },
-      { speaker: "speaker_0", start: 36.5, end: 40.0 },
-      { speaker: "speaker_1", start: 40.5, end: 42.5 },
-      { speaker: "speaker_0", start: 43.0, end: 46.5 },
-    ],
-    emotion_data: {
-      agent: ["平静", "平静", "平静", "平静", "平静", "平静", "平静", "平静"],
-      customer: ["愤怒", "愤怒", "愤怒", "不满", "质疑", "平静", "平静", "平静"],
-      overall: "客户从愤怒质疑转为接受，客服及时补救有效",
-      trend: {
-        customerStart: "愤怒",
-        customerEnd: "平静",
-        negativeShiftCount: 4,
-        resolved: true,
-      },
-    },
-    quality_result: {
-      totalScore: 75,
-      level: "C",
-      dimensions: {
-        compliance: { score: 8, reason: "开场白和结束语规范，但中间有推诿倾向" },
-        knowledge: { score: 7, reason: "首次应答试图转接而非直接处理，流程不熟" },
-        process: { score: 7, reason: "前期有推诿行为，后期才主动处理" },
-        communication: { score: 8, reason: "补救措施得当，但前期缺乏同理心" },
-      },
-      violations: [
-        { type: "process_error", detail: "首次应答试图推诿转接，未主动处理退款", severity: "major" },
-      ],
-      suggestions: [
-        "加强退款流程培训，避免不必要的转接",
-        "提高首次应答效率，减少客户等待",
-        "加强共情表达，先安抚再解决问题",
-      ],
-    },
-  },
-};
+const scenariosDir = path.join(__dirname, "..", "scenarios");
+
+function loadScenarios() {
+  const scenarios = {};
+  if (!fs.existsSync(scenariosDir)) return scenarios;
+
+  const files = fs.readdirSync(scenariosDir).filter((f) => f.endsWith(".json"));
+  for (const file of files) {
+    try {
+      const data = JSON.parse(fs.readFileSync(path.join(scenariosDir, file), "utf-8"));
+      Object.assign(scenarios, data);
+    } catch (err) {
+      console.error(`[Scenarios] 加载 ${file} 失败:`, err.message);
+    }
+  }
+  return scenarios;
+}
+
+const scenarios = loadScenarios();
 
 function getScenarioList() {
   return Object.values(scenarios).map((s) => ({
@@ -196,7 +36,7 @@ function getScenarioList() {
 }
 
 function getScenario(id) {
-  return scenarios[id] || scenarios.A;
+  return scenarios[id] || scenarios[Object.keys(scenarios)[0]] || null;
 }
 
 module.exports = { scenarios, getScenarioList, getScenario };
