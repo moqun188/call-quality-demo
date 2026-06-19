@@ -1,0 +1,92 @@
+{
+  "name": "default",
+  "label": "通用客服质检规则",
+  "version": "1.0.0",
+  "description": "适用于通用客服场景的质检规则，涵盖话术合规、业务知识、流程完整性和沟通技巧",
+
+  "standards": {
+    "opening": ["您好", "欢迎致电", "请问有什么可以帮您"],
+    "closing": ["感谢", "祝您", "再见", "生活愉快"],
+    "polite": ["请", "谢谢", "您", "麻烦", "抱歉", "理解"],
+    "prohibited": ["不知道", "不归我管", "没办法", "你自己", "不关我事"],
+    "process": ["开场问候", "身份确认", "需求了解", "方案提供", "问题解决", "结束确认"]
+  },
+
+  "weights": {
+    "compliance": 0.30,
+    "knowledge": 0.25,
+    "process": 0.25,
+    "communication": 0.20
+  },
+
+  "levels": {
+    "A": 90,
+    "B": 80,
+    "C": 70,
+    "D": 60
+  },
+
+  "penalties": {
+    "critical": 5,
+    "major": 2,
+    "minor": 0
+  },
+
+  "dimensions": {
+    "compliance": {
+      "baseScore": 5,
+      "checks": {
+        "opening": { "points": 1.5, "message": "已使用标准开场白" },
+        "closing": { "points": 1.5, "message": "已使用标准结束语" },
+        "politeThreshold": { "value": 4, "points": 1, "message": "礼貌用语使用充分" },
+        "politeHigh": { "value": 8, "points": 2, "message": "礼貌用语频次优秀" }
+      }
+    },
+    "knowledge": {
+      "baseScore": 5,
+      "questionKeywords": ["?", "？", "怎么", "如何", "吗"],
+      "concernKeywords": ["不合适", "偏小", "运费", "退货"],
+      "answerKeywords": ["码数", "退货", "运费"],
+      "correctiveKeywords": ["7天", "退货期", "24小时"]
+    },
+    "process": {
+      "baseScore": 4,
+      "stages": {
+        "opening": { "keywords": ["您好", "欢迎致电", "请问有什么可以帮您"] },
+        "infoRequest": { "keywords": ["订单号", "提供"] },
+        "problemIdentified": { "keywords": ["不合适", "退货"] },
+        "solution": { "keywords": ["提交", "申请", "寄回"] },
+        "closing": { "keywords": ["感谢", "祝您", "再见", "生活愉快"] }
+      }
+    },
+    "communication": {
+      "baseScore": 5,
+      "confirmKeywords": ["理解", "查到", "请问"],
+      "empathyKeywords": ["理解", "麻烦", "抱歉"],
+      "guideKeywords": ["可以", "联系", "发到"],
+      "proactiveKeywords": ["帮您", "为您", "我帮"]
+    }
+  },
+
+  "violations": {
+    "noNeedConfirm": {
+      "type": "process_error",
+      "detail": "未进行需求确认",
+      "severity": "major",
+      "checkKeywords": ["请问", "吗"]
+    }
+  },
+
+  "strengths": {
+    "empathy": { "keywords": ["理解"], "label": "共情能力好" },
+    "polite": { "keywords": ["请"], "label": "礼貌用语规范" },
+    "costExplain": { "keywords": ["运费", "承担"], "label": "主动说明费用承担" }
+  },
+
+  "suggestions": {
+    "compliance": { "threshold": 8, "message": "加强开场白和结束语的标准话术培训" },
+    "knowledge": { "threshold": 8, "message": "建议补充产品知识库，提高应答准确率" },
+    "process": { "threshold": 8, "message": "注意服务流程的完整性，增加确认环节" },
+    "communication": { "threshold": 8, "message": "提升共情表达，主动引导客户情绪" }
+  }
+}

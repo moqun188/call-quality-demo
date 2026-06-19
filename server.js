@@ -9,8 +9,12 @@ const { getScenarioList } = require("./pipeline/scenarios");
 const { exportToExcel, exportToJSON } = require("./pipeline/reportExporter");
 const statsManager = require("./pipeline/statsManager");
 const { exportToObsidian, getVaultStats } = require("./pipeline/obsidianExporter");
+const { loadRules, listRules } = require("./pipeline/rulesLoader");
+const { generateEvolutionInsights } = require("./pipeline/selfEvolution");
+const BatchQueue = require("./pipeline/batchQueue");
 
 const app = express();
+const batchQueue = new BatchQueue();
 const PORT = process.env.PORT || 3000;
 
 // 清理上传的临时文件（质检成功后）
@@ -47,8 +51,6 @@ const upload = multer({
     }
   },
 });
-
-const pipeline = new QualityInspectionPipeline({ mockMode: false });
 
 function buildReportFileName(data, extension) {
   const rawBase = String(data.fileName || "质检报告").replace(/\.[^.\\/]+$/, "");
@@ -97,6 +99,8 @@ app.post("/api/inspect", upload.single("audio"), async (req, res) => {
   };
 
   const stepStart = Date.now();
+  const ruleName = req.body?.ruleName || req.query?.ruleName || "default";
+  const pipeline = new QualityInspectionPipeline({ ruleName });
 
   try {
     const result = await pipeline.run(req.file.path, req.file.originalname, null, async (stepIndex, step) => {
@@ -133,6 +137,8 @@ app.post("/api/inspect/stream", upload.single("audio"), async (req, res) => {
   };
 
   const stepStart = Date.now();
+  const ruleName = req.body?.ruleName || req.query?.ruleName || "default";
+  const pipeline = new QualityInspectionPipeline({ ruleName });
 
   try {
     const result = await pipeline.run(req.file.path, req.file.originalname, null, (stepIndex, step) => {
@@ -153,7 +159,9 @@ app.post("/api/inspect/stream", upload.single("audio"), async (req, res) => {
 app.post("/api/inspect/demo", async (req, res) => {
   try {
     const scenario = req.query.scenario || "A";
-    const result = await pipeline.run("demo", "demo_sample.wav", scenario);
+    const ruleName = req.body?.ruleName || req.query?.ruleName || "default";
+    const demoPipeline = new QualityInspectionPipeline({ mockMode: false, ruleName });
+    const result = await demoPipeline.run("demo", "demo_sample.wav", scenario);
     statsManager.addInspection(result);
     res.json({
       success: true,
@@ -243,6 +251,96 @@ app.get("/api/obsidian/stats", (req, res) => {
     console.error("获取Obsidian统计失败:", err);
     res.status(500).json({ error: err.message });
   }
+});
+
+// 自我进化 API
+app.get("/api/evolution", (req, res) => {
+  try {
+    const db = require("./pipeline/database").getDb();
+    const insights = generateEvolutionInsights(db);
+    db.close();
+    res.json({ success: true, data: insights });
+  } catch (err) {
+    console.error("自我进化分析失败:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 规则管理 API
+app.get("/api/rules", (req, res) => {
+  try {
+    const rules = listRules();
+    res.json({ success: true, data: rules });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/rules/:name", (req, res) => {
+  try {
+    const rules = loadRules(req.params.name);
+    res.json({ success: true, data: rules });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 批量质检 API — 复用已有的 upload 实例
+app.post("/api/batch/inspect", upload.array("audio", 20), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: "请上传至少一个音频文件" });
+    }
+
+    const ruleName = req.body?.ruleName || "default";
+    const job = batchQueue.createJob(req.files);
+    const batchId = job.batchId;
+
+    // 异步逐个处理，不阻塞响应
+    (async () => {
+      for (const item of job.items) {
+        batchQueue.updateItemStatus(batchId, item.itemId, "processing");
+        try {
+          const pipeline = new QualityInspectionPipeline({ ruleName });
+          const result = await pipeline.run(item.filePath, item.fileName, null, () => {});
+          statsManager.addInspection(result);
+          batchQueue.updateItemStatus(batchId, item.itemId, "completed", {
+            totalScore: result.quality.totalScore,
+            level: result.quality.level,
+          });
+          cleanupUploads(item.filePath, result.convertedPath);
+        } catch (err) {
+          console.error(`[Batch] ${item.fileName} 处理失败:`, err.message);
+          batchQueue.updateItemStatus(batchId, item.itemId, "failed", null, err.message);
+        }
+      }
+    })();
+
+    res.json({
+      success: true,
+      data: {
+        batchId,
+        total: job.total,
+        status: "running",
+      },
+    });
+  } catch (err) {
+    console.error("批量质检失败:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/batch/:batchId", (req, res) => {
+  const job = batchQueue.getJob(req.params.batchId);
+  if (!job) {
+    return res.status(404).json({ error: "批次不存在" });
+  }
+  res.json({ success: true, data: job });
+});
+
+app.get("/api/batch", (req, res) => {
+  const jobs = batchQueue.getAllJobs();
+  res.json({ success: true, data: jobs });
 });
 
 app.post("/api/test/asr", upload.single("audio"), async (req, res) => {
@@ -346,7 +444,7 @@ app.post("/api/test/asr", upload.single("audio"), async (req, res) => {
       success: response.ok,
       status: response.status,
       responseTime: `${responseTime}ms`,
-      apiKeyConfigured: !!apiKey,
+      apiKeyConfigured: Boolean(apiKey),
       model: modelName,
       fileSize: audioBuffer.length,
       mimeType: mimeType,

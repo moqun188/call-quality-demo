@@ -17,7 +17,7 @@ function migrateFromJson(db) {
   // 迁移 inspections
   if (fs.existsSync(inspectionsJson)) {
     try {
-      let raw = fs.readFileSync(inspectionsJson, "utf-8").replace(/^\uFEFF/, "").trim();
+      const raw = fs.readFileSync(inspectionsJson, "utf-8").replace(/^\uFEFF/, "").trim();
       if (raw) {
         const items = JSON.parse(raw);
         if (Array.isArray(items) && items.length > 0) {
@@ -60,7 +60,7 @@ function migrateFromJson(db) {
   // 迁移 token_usage
   if (fs.existsSync(tokenJson)) {
     try {
-      let raw = fs.readFileSync(tokenJson, "utf-8").replace(/^\uFEFF/, "").trim();
+      const raw = fs.readFileSync(tokenJson, "utf-8").replace(/^\uFEFF/, "").trim();
       if (raw) {
         const items = JSON.parse(raw);
         if (Array.isArray(items) && items.length > 0) {
@@ -139,7 +139,7 @@ function parseRow(row) {
     totalScore: row.total_score,
     level: row.level,
     emotion: row.emotion,
-    usedMultimodal: !!row.used_multimodal,
+    usedMultimodal: Boolean(row.used_multimodal),
     apiCallCount: row.api_call_count,
     sessionId: row.session_id,
     dimensions: tryParse(row.dimensions, {}),
@@ -258,7 +258,7 @@ function getTokenStats() {
     timestamp: r.timestamp,
     fileName: r.file_name,
     duration: r.duration,
-    usedMultimodal: !!r.used_multimodal,
+    usedMultimodal: Boolean(r.used_multimodal),
     actualApiCalls: r.actual_api_calls,
     actualTokens: tryParse(r.actual_tokens, {}),
     legacyTokens: tryParse(r.legacy_tokens, {}),

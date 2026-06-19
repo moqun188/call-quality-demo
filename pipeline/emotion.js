@@ -136,7 +136,9 @@ ${transcriptLines}
       try {
         const m = cleaned.match(/\{[\s\S]*\}/);
         if (m) data = JSON.parse(m[0]);
-      } catch (e2) {}
+      } catch (e2) {
+        // ignore parse fallback error
+      }
     }
 
     if (data && Array.isArray(data.utterances)) {

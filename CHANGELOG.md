@@ -5,12 +5,59 @@
 
 ---
 
-## [Unreleased] - 开发中
+## [0.4.0] - 2026-06-18
 
-### 已知问题
-- statsManager.avgDimensions NaN Bug（P0-001）
-- uploads 目录不清理（P0-003）
-- 日志无轮转（P0-004）
+### 新增 (Added)
+- **自我进化引擎** (`pipeline/selfEvolution.js`): 基于历史数据自动分析趋势、发现规则盲区、生成优化建议
+- **What's New 页面** (`public/whats-new.html`): 系统更新日志时间线展示
+- **自我进化仪表盘** (`public/evolution.html`): 趋势概览、维度分析、等级分布、规则有效性、盲区发现
+- **春苗热线质检规则** (`rules/chunmiao-hotline.json`): 基金会热线初筛场景专属规则
+- **热线话术标准版** (`obsidian-vault/qa/热线初筛话术FAQ（标准版）.md`): 合并两份文档
+- **疑问清单** (`obsidian-vault/qa/疑问清单 - 待团队确认.md`): 5 个遗留疑问 + 4 个文档优化建议
+- API `/api/evolution`: 自我进化洞察接口
+- 首页导航新增"自我进化"和"更新日志"入口
+
+---
+
+## [0.3.2] - 2026-06-18
+
+### 新增 (Added)
+- **质检规则可配置化**: `rules/default.json` 外部 JSON 规则配置
+- `pipeline/rulesLoader.js`: 规则加载器（支持引用解析 `$standards.opening`）
+- **Obsidian 知识库增强**: frontmatter Dataview 字段、质检仪表盘自动汇总、wikilinks 内链
+- API `/api/rules`、`/api/rules/:name`: 规则管理端点
+- 质检接口支持 `ruleName` 参数指定规则
+
+### 重构 (Refactored)
+- `pipeline/qualityAnalyzer.js`: 从硬编码改为读取外部规则
+- 移除 `server.js` 全局 pipeline 实例，改为按请求创建
+
+---
+
+## [0.3.1] - 2026-06-18
+
+### 新增 (Added)
+- **ESLint + Prettier**: `eslint.config.js` (v10 flat config) + `.prettierrc`
+- npm scripts: `lint` / `lint:fix` / `format` / `format:check`
+- **Jest 测试框架**: `jest.config.js` + 3 套件 18 测试
+  - `tests/logger.test.js`: Logger 日志级别/sessionId/文件写入 (6 tests)
+  - `tests/database.test.js`: 表创建/索引/CRUD (6 tests)
+  - `tests/statsManager.test.js`: addInspection/getStats/getHistory/getTokenStats (6 tests)
+- npm scripts: `test` / `test:watch` / `test:coverage`
+
+### 修复 (Fixed)
+- 修复 8 个 ESLint error (eqeqeq, no-empty, no-useless-escape, no-useless-assignment)
+
+---
+
+## [0.3.0] - 2026-06-17
+
+### 新增 (Added)
+- **SQLite 数据库** (`pipeline/database.js`): better-sqlite3 替换 JSON 文件存储
+- 两张表: `inspections` + `token_usage`
+- WAL 模式 + 索引优化
+- 自动迁移已有 JSON 数据并备份为 `.bak`
+- `pipeline/statsManager.js`: 从 JSON 文件迁移到 SQLite
 
 ---
 
@@ -18,39 +65,23 @@
 
 ### 优化 (Changed)
 - **P0-002**: 合并 ASR + 说话人分离 + 情绪分析为单次多模态 API 调用
-  - 新增 `pipeline/multimodalAnalyzer.js`：使用 `mimo-v2.5-pro` 一次性完成 ASR/说话人/情绪
-  - 改造 `pipeline/index.js`：优先多模态单次调用，失败自动回退到各模块独立调用
-  - API 调用次数从 3 次 → 1 次（音频）+ 1 次（文本总结）= 总共 2 次
-  - 节省 60%+ Credits，质检耗时预计从 15-30 秒降至 3-8 秒
-  - 负责人: moqun188
+  - 新增 `pipeline/multimodalAnalyzer.js`
+  - API 调用次数从 3 次 → 2 次，节省 60%+ Credits
+
+### 修复 (Fixed)
+- **P0-001**: statsManager NaN Bug (`r.dimensions[k]?.score`)
+- **P0-003**: uploads 质检成功后自动清理
+- **P0-004**: 日志轮转 10MB + sessionId + 7天清理
+
+### 新增 (Added)
+- Token 用量统计页面 (`/token-usage.html`)
 
 ---
 
 ## [0.1.2] - 2026-06-17
 
 ### 修复 (Fixed)
-- **BUG-005b**: 修复 v0.1.1 中客服/客户角色识别仍未解决的问题
-  - 根因: `_detectRoles()` 仍以"第一个说话人默认为客服"为基础，但电话场景中接听方（客户）先开口
-  - 修复: 彻底重写为**双说话人关键词得分比较**策略
-    - 不假设谁先说话
-    - 分别计算每个说话人的客服特征词得分和客户特征词得分
-    - 客服得分高 → agent，客户得分高 → customer
-    - 客服关键词: 请问/欢迎致电/这边是/帮您/为您/排在/社工/跟进/安排/回访/确认信息 等
-    - 客户关键词: 我想/我要/咨询/退货/退款/办了/医保/新农合/好好好/什么时候 等
-    - 兜底: 使用"您"的频率（客服对客户用"您"），最终默认第一个说话人为 customer
-  - 负责人: moqun188
-  - 影响范围: pipeline/diarization.js `_detectRoles()`
-
----
-
-## [0.1.1] - 2026-06-17
-
-### 修复 (Fixed)
-- **BUG-005**: 修复客服/客户角色标注反转问题
-  - 根因: `pipeline/diarization.js` 的 `align()` 方法硬编码 `speaker_0 = agent`，但小米 MiMo API 的说话人编号是任意的
-  - 修复: 新增 `_detectRoles()` 方法，基于「第一个说话人默认为客服」+ 关键词校验自动检测角色
-  - 负责人: moqun188
-  - 影响范围: pipeline/diarization.js
+- **BUG-005**: 客服/客户角色标注反转 — 双说话人关键词得分比较策略
 
 ---
 
@@ -63,12 +94,3 @@
 - 多格式导出（Excel / JSON / Obsidian Markdown）
 - NDJSON 流式进度推送
 - Dashboard 统计面板
-- ASR 测试页面
-- 完整的日志系统
-- GitHub 仓库: https://github.com/moqun188/call-quality-demo
-
-### 文档 (Docs)
-- 长期演进规划 (P0-P3)
-- 协作开发指南
-- 分支策略
-- P0 任务清单

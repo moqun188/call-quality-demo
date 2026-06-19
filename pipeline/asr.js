@@ -125,7 +125,7 @@ class ASREngine {
     logger.info(`[ASR] 原始返回文本长度: ${content.length}`);
 
     let segments = [];
-    let duration = 0;
+    let duration;
 
     // 策略 1: 尝试解析 JSON { segments: [...] }
     try {
@@ -147,7 +147,7 @@ class ASREngine {
     // 策略 2: 按换行切分，识别时间戳 [00:00 - 00:03]
     if (segments.length === 0) {
       const lines = content.split("\n").map(l => l.trim()).filter(Boolean);
-      const timePattern = /[\[]?(\d{1,2}:\d{2}(?:\.\d+)?)\s*[-–~]\s*(\d{1,2}:\d{2}(?:\.\d+)?)[\]]?\s*(.*)/;
+      const timePattern = /[[]?(\d{1,2}:\d{2}(?:\.\d+)?)\s*[-–~]\s*(\d{1,2}:\d{2}(?:\.\d+)?)[\]]?\s*(.*)/;
       let collected = [];
 
       for (let idx = 0; idx < lines.length; idx++) {
@@ -217,7 +217,7 @@ class ASREngine {
     // 按中文标点（。？！；）和英文标点（.!?;）分段
     // 保留逗号用于分句，但不强制
     const sentenceEnds = /[。！？!?;；]/g;
-    let matches = [];
+    const matches = [];
     let m;
     while ((m = sentenceEnds.exec(text)) !== null) {
       matches.push(m.index);

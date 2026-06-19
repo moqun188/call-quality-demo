@@ -16,79 +16,69 @@ function formatDate(dateStr) {
 }
 
 function formatTime(sec) {
-  if (sec == null) return "";
+  if (sec === null || sec === undefined) return "";
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
   return m > 0 ? `${m}:${s.toString().padStart(2, "0")}` : `${s}s`;
 }
 
 function getLevelColor(level) {
-  const colors = {
-    A: "#16a34a",
-    B: "#22c55e",
-    C: "#ca8a04",
-    D: "#ea580c",
-    E: "#dc2626",
-  };
+  const colors = { A: "#16a34a", B: "#22c55e", C: "#ca8a04", D: "#ea580c", E: "#dc2626" };
   return colors[level] || "#666";
 }
 
 function getEmotionEmoji(label) {
-  const map = {
-    "平静": "😐",
-    "愉悦": "😊",
-    "焦急": "😰",
-    "愤怒": "😠",
-    "不满": "😒",
-    "困惑": "🤔",
-    "冷漠": "😑",
-    "惊讶": "😲",
-  };
+  const map = { "平静": "😐", "愉悦": "😊", "焦急": "😰", "愤怒": "😠", "不满": "😒", "困惑": "🤔", "冷漠": "😑", "惊讶": "😲" };
   return map[label] || "";
+}
+
+function getLevelTag(level) {
+  return { A: "优秀", B: "良好", C: "合格", D: "待改进", E: "不合格" }[level] || "未知";
 }
 
 function generateNoteContent(data) {
   const q = data.quality;
   const dims = q.dimensions;
   const summary = data.callSummary || data.summary;
+  const levelTag = getLevelTag(q.level);
 
-  let content = `---
-aliases:
-tags: [质检报告, 客服质检, ${q.level}级]
+  return `---
+aliases: ["${data.fileName}"]
+tags: [质检报告, ${q.level}级, ${levelTag}]
 date: ${formatDate(data.timestamp)}
-filename: ${data.fileName}
+filename: "${data.fileName}"
 totalScore: ${q.totalScore}
 level: ${q.level}
+ruleName: "${q.ruleName || "default"}"
+ruleVersion: "${q.ruleVersion || "1.0.0"}"
 ---
 
-# 📞 ${data.fileName} 质检报告
+# ${data.fileName} 质检报告
 
-## 📊 评分概览
+## 评分概览
 
 | 项目 | 分数 | 等级 |
 |------|------|------|
-| 综合评分 | **${q.totalScore}** | <span style="color:${getLevelColor(q.level)}">**${q.level}级**</span> |
+| 综合评分 | **${q.totalScore}** | ${q.level}级 (${levelTag}) |
 
 ### 各维度详情
 
 | 维度 | 分数 | 评价 |
 |------|------|------|
-| 📋 话术合规 | ${dims.compliance.score}/10 | ${dims.compliance.reason} |
-| 📚 业务知识 | ${dims.knowledge.score}/10 | ${dims.knowledge.reason} |
-| 🔄 流程完整 | ${dims.process.score}/10 | ${dims.process.reason} |
-| 💬 沟通技巧 | ${dims.communication.score}/10 | ${dims.communication.reason} |
+| 话术合规 | ${dims.compliance.score}/10 | ${dims.compliance.reason} |
+| 业务知识 | ${dims.knowledge.score}/10 | ${dims.knowledge.reason} |
+| 流程完整 | ${dims.process.score}/10 | ${dims.process.reason} |
+| 沟通技巧 | ${dims.communication.score}/10 | ${dims.communication.reason} |
 
 ---
 
-## 🎯 质检结论
+## 质检结论
 
-**${data.summary?.title || q.level + '级 — ' + q.totalScore + '分'}**
-
-> ${data.summary?.verdict || (q.totalScore >= 80 ? "服务表现良好" : q.totalScore >= 60 ? "服务基本合格" : "服务需改进")}
+> ${q.totalScore >= 80 ? "服务表现良好" : q.totalScore >= 60 ? "服务基本合格" : "服务需改进"}
 
 ### 亮点
 
-${(data.summary?.highlights || []).map(h => `- ${h}`).join("\n")}
+${(q.strengths || []).map((h) => `- ${h}`).join("\n")}
 
 ### 情绪分析
 
@@ -96,8 +86,7 @@ ${data.emotion?.overall || "无"}
 
 ---
 
-${summary ? `
-## 📋 通话总结
+${summary ? `## 通话总结
 
 ### 通话目的
 ${summary.callPurpose || "未知"}
@@ -106,64 +95,109 @@ ${summary.callPurpose || "未知"}
 ${summary.customerRequest || "无"}
 
 ### 关键要点
-${(summary.keyPoints || []).map(p => `- ${p}`).join("\n")}
+${(summary.keyPoints || []).map((p) => `- ${p}`).join("\n")}
 
 ### 解决状态
 ${summary.resolutionStatus || "未知"}
 
 ### 后续行动项
-${(summary.actionItems || []).map(a => `- ${a}`).join("\n")}
+${(summary.actionItems || []).map((a) => `- ${a}`).join("\n")}
 
 ### 质量问题
-${(summary.qualityIssues || []).map(i => `- ${i}`).join("\n")}
+${(summary.qualityIssues || []).map((i) => `- ${i}`).join("\n")}
 
 ### 总体评价
 ${summary.overallAssessment || "无"}
 
 ### 改进建议
-${(summary.improvementSuggestions || []).map(s => `- ${s}`).join("\n")}
+${(summary.improvementSuggestions || []).map((s) => `- ${s}`).join("\n")}
 
 ---
 
-` : ''}
-## 📝 对话转写
+` : ""}## 对话转写
 
-${data.utterances.map((u, i) => {
-  const role = u.role === "agent" ? "客服" : "客户";
-  const roleEmoji = u.role === "agent" ? "👤" : "👥";
-  const emotion = u.emotion?.label ? getEmotionEmoji(u.emotion.label) + " " + u.emotion.label : "";
-  return `### ${i + 1}. ${roleEmoji} ${role} [${formatTime(u.start)} ~ ${formatTime(u.end)}] ${emotion}
+${data.utterances
+  .map((u, i) => {
+    const role = u.role === "agent" ? "客服" : "客户";
+    const roleEmoji = u.role === "agent" ? "👤" : "👥";
+    const emotion = u.emotion?.label ? getEmotionEmoji(u.emotion.label) + " " + u.emotion.label : "";
+    return `### ${i + 1}. ${roleEmoji} ${role} [${formatTime(u.start)} ~ ${formatTime(u.end)}] ${emotion}
 
 > ${u.text}`;
-}).join("\n\n")}
+  })
+  .join("\n\n")}
 
 ---
 
-## ⚠️ 违规记录
+## 违规记录
 
-${q.violations && q.violations.length > 0 
-  ? q.violations.map(v => `- **${v.severity === "critical" ? "严重" : v.severity === "major" ? "一般" : "轻微"}**: ${v.detail}`).join("\n")
-  : "✅ 未检出违规项"}
+${q.violations && q.violations.length > 0 ? q.violations.map((v) => `- **${v.severity === "critical" ? "严重" : v.severity === "major" ? "一般" : "轻微"}**: ${v.detail}`).join("\n") : "未检出违规项"}
 
 ---
 
-## 💡 改进建议
+## 改进建议
 
 ${q.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
 
 ---
 
-*Generated by 录音质检系统 | ${formatDate(new Date().toISOString())}*
+*Generated by 录音质检系统 | ${formatDate(new Date().toISOString())} | 规则: ${q.ruleName || "default"} v${q.ruleVersion || "1.0.0"}*
 `;
+}
 
-  return content;
+function generateDashboard(allReports) {
+  const total = allReports.length;
+  if (total === 0) return "# 质检仪表盘\n\n> 暂无质检记录";
+
+  const avgScore = Math.round(allReports.reduce((s, r) => s + r.totalScore, 0) / total);
+  const levelDist = {};
+  allReports.forEach((r) => { levelDist[r.level] = (levelDist[r.level] || 0) + 1; });
+
+  const top5 = allReports.slice(0, 5);
+  const worst5 = [...allReports].sort((a, b) => a.totalScore - b.totalScore).slice(0, 5);
+
+  return `---
+tags: [仪表盘, 质检统计]
+date: ${formatDate(new Date().toISOString())}
+---
+
+# 质检仪表盘
+
+## 总览
+
+| 指标 | 值 |
+|------|------|
+| 总质检数 | ${total} |
+| 平均分 | ${avgScore} |
+| A级 (优秀) | ${levelDist.A || 0} |
+| B级 (良好) | ${levelDist.B || 0} |
+| C级 (合格) | ${levelDist.C || 0} |
+| D级 (待改进) | ${levelDist.D || 0} |
+| E级 (不合格) | ${levelDist.E || 0} |
+
+## 最近质检
+
+| 文件 | 分数 | 等级 | 时间 |
+|------|------|------|------|
+${top5.map((r) => `| [[${r.fileName}]] | ${r.totalScore} | ${r.level} | ${formatDate(r.timestamp)} |`).join("\n")}
+
+## 低分预警
+
+| 文件 | 分数 | 等级 | 时间 |
+|------|------|------|------|
+${worst5.map((r) => `| [[${r.fileName}]] | ${r.totalScore} | ${r.level} | ${formatDate(r.timestamp)} |`).join("\n")}
+
+---
+
+*自动生成 | ${formatDate(new Date().toISOString())}*
+`;
 }
 
 async function exportToObsidian(data) {
   const vaultPath = OBSIDIAN_VAULT;
   const reportsDir = path.join(vaultPath, "质检报告");
   const attachmentsDir = path.join(reportsDir, "附件");
-  
+
   ensureDir(reportsDir);
   ensureDir(attachmentsDir);
 
@@ -180,27 +214,62 @@ async function exportToObsidian(data) {
   const jsonFileName = `${timestamp}_${safeName}_原始数据.json`;
   fs.writeFileSync(path.join(attachmentsDir, jsonFileName), jsonContent, "utf-8");
 
-  return {
-    success: true,
-    filePath,
-    fileName,
-    vaultPath,
-  };
+  // 更新仪表盘
+  try {
+    const allReports = loadAllReports(reportsDir);
+    const dashboardPath = path.join(vaultPath, "质检仪表盘.md");
+    fs.writeFileSync(dashboardPath, generateDashboard(allReports), "utf-8");
+  } catch (err) {
+    console.error("[Obsidian] 仪表盘更新失败:", err.message);
+  }
+
+  return { success: true, filePath, fileName, vaultPath };
+}
+
+function loadAllReports(reportsDir) {
+  if (!fs.existsSync(reportsDir)) return [];
+  const files = fs.readdirSync(reportsDir).filter((f) => f.endsWith(".md") && !f.startsWith("质检仪表盘"));
+  return files.map((f) => {
+    try {
+      const content = fs.readFileSync(path.join(reportsDir, f), "utf-8");
+      const frontmatter = content.match(/^---([\s\S]*?)---/);
+      if (!frontmatter) return null;
+      const meta = {};
+      for (const line of frontmatter[1].split("\n")) {
+        const m = line.match(/^(\w+):\s*(.+)/);
+        if (m) meta[m[1]] = m[2].trim().replace(/^["']|["']$/g, "");
+      }
+      return {
+        fileName: meta.filename || f,
+        totalScore: parseInt(meta.totalScore) || 0,
+        level: meta.level || "?",
+        timestamp: meta.date || "",
+      };
+    } catch {
+      return null;
+    }
+  }).filter(Boolean).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 }
 
 function getVaultStats() {
   const vaultPath = OBSIDIAN_VAULT;
   const reportsDir = path.join(vaultPath, "质检报告");
-  
+
   if (!fs.existsSync(reportsDir)) {
-    return { totalReports: 0, vaultExists: false };
+    return { totalReports: 0, vaultExists: false, reports: [] };
   }
 
-  const files = fs.readdirSync(reportsDir).filter(f => f.endsWith(".md"));
+  const reports = loadAllReports(reportsDir);
+  const avgScore = reports.length > 0
+    ? Math.round(reports.reduce((s, r) => s + r.totalScore, 0) / reports.length)
+    : 0;
+
   return {
-    totalReports: files.length,
+    totalReports: reports.length,
     vaultExists: true,
     vaultPath,
+    avgScore,
+    reports: reports.slice(0, 20),
   };
 }
 

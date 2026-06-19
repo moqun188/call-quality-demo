@@ -1,0 +1,122 @@
+{
+  "name": "chunmiao-hotline",
+  "label": "春苗热线初筛话术规则",
+  "version": "1.0.0",
+  "description": "北京春苗慈善基金会求助热线初筛场景质检规则",
+
+  "standards": {
+    "opening": ["北京春苗慈善基金会"],
+    "closing": ["保持电话畅通"],
+    "polite": ["请", "您", "麻烦", "抱歉", "理解", "请问"],
+    "prohibited": ["社工会接案", "具体时间", "大概一个月", "大概半个月", "免费", "团队"],
+    "requiredPhrases": ["热线结案"],
+    "process": ["自我介绍", "告知排队位", "询问病情", "判断出院", "结束语"]
+  },
+
+  "weights": {
+    "compliance": 0.35,
+    "knowledge": 0.20,
+    "process": 0.30,
+    "communication": 0.15
+  },
+
+  "levels": {
+    "A": 90,
+    "B": 80,
+    "C": 70,
+    "D": 60
+  },
+
+  "penalties": {
+    "critical": 8,
+    "major": 3,
+    "minor": 1
+  },
+
+  "dimensions": {
+    "compliance": {
+      "baseScore": 7,
+      "checks": {
+        "opening": { "points": 1, "message": "已使用标准自我介绍（春苗慈善基金会）" },
+        "closing": { "points": 1, "message": "结束语包含'保持电话畅通'" },
+        "politeThreshold": { "value": 3, "points": 1, "message": "礼貌用语使用充分" }
+      }
+    },
+    "knowledge": {
+      "baseScore": 7,
+      "questionKeywords": ["吗", "？", "?"],
+      "concernKeywords": ["出院", "排队", "结案", "病情", "养育"],
+      "answerKeywords": ["热线结案", "排队", "社工联系", "保持电话畅通"],
+      "correctiveKeywords": ["第x位", "排到", "顺序"]
+    },
+    "process": {
+      "baseScore": 5,
+      "stages": {
+        "selfIntro": { "keywords": ["北京春苗慈善基金会", "工作人员"] },
+        "queuePosition": { "keywords": ["排在第", "排队", "第xxx位", "第x位"] },
+        "askCondition": { "keywords": ["出院了吗", "病情", "宝宝现在"] },
+        "judgeStatus": { "keywords": ["出院", "结案", "离世", "转院"] },
+        "closing": { "keywords": ["保持电话畅通", "社工联系", "社工会打"] }
+      }
+    },
+    "communication": {
+      "baseScore": 7,
+      "confirmKeywords": ["请问", "确认", "了解"],
+      "empathyKeywords": ["理解", "抱歉", "能理解", "非常理解"],
+      "guideKeywords": ["后续", "联系您", "保持", "备注"]
+    }
+  },
+
+  "violations": {
+    "wrongClosing": {
+      "type": "prohibited_word",
+      "detail": "使用了'社工会接案'（应说'社工按顺序联系'）",
+      "severity": "critical",
+      "checkKeywords": ["社工会接案"]
+    },
+    "timePromise": {
+      "type": "prohibited_word",
+      "detail": "给出了具体时间承诺",
+      "severity": "critical",
+      "checkKeywords": ["具体时间", "大概一个月", "大概半个月", "一周内", "两周内"]
+    },
+    "useFree": {
+      "type": "prohibited_word",
+      "detail": "使用了'免费'一词（待确认是否违规）",
+      "severity": "minor",
+      "checkKeywords": ["免费"]
+    },
+    "useTeam": {
+      "type": "prohibited_word",
+      "detail": "使用了'团队'一词（待确认是否违规）",
+      "severity": "minor",
+      "checkKeywords": ["团队"]
+    },
+    "noMentionCaseClose": {
+      "type": "process_error",
+      "detail": "未明确告知'热线结案'",
+      "severity": "major",
+      "checkKeywords": ["热线结案"]
+    },
+    "noQueuePosition": {
+      "type": "process_error",
+      "detail": "未告知排队位置",
+      "severity": "major",
+      "checkKeywords": ["排在第", "排队", "第xxx位", "第x位"]
+    }
+  },
+
+  "strengths": {
+    "empathy": { "keywords": ["理解", "非常理解", "能理解"], "label": "共情表达良好" },
+    "polite": { "keywords": ["请", "麻烦"], "label": "礼貌用语规范" },
+    "clearProcess": { "keywords": ["热线结案", "社工联系"], "label": "流程说明清晰" },
+    "askDetails": { "keywords": ["病情", "出院"], "label": "主动询问关键信息" }
+  },
+
+  "suggestions": {
+    "compliance": { "threshold": 8, "message": "加强标准话术培训，确保开场白和结束语规范" },
+    "knowledge": { "threshold": 8, "message": "补充业务知识，确保准确告知排队和结案流程" },
+    "process": { "threshold": 8, "message": "注意初筛流程完整性，每个环节不得遗漏" },
+    "communication": { "threshold": 8, "message": "提升共情表达，面对家长情绪时先共情后引导" }
+  }
+}

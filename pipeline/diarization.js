@@ -195,7 +195,9 @@ class DiarizationEngine {
         // mp3 @ 64kbps ≈ 8KB/s，粗估时长
         durationSec = Math.max(10, Math.round(stat.size / 8000));
       }
-    } catch (e) {}
+    } catch (e) {
+      // ignore stat errors
+    }
 
     const numSegments = Math.max(4, Math.round(durationSec / 6));
     const segLen = durationSec / numSegments;
@@ -260,49 +262,62 @@ class DiarizationEngine {
       speakerTexts[u.speaker].push(u.text);
     }
 
-    // 客服特征词（服务方常用语）
-    const agentPattern = /请问|欢迎致电|您好.*客服|帮您|为您|这边是|我帮您|您.*需要|工号|您.*方便|温馨提示|回访|跟进|安排|为您.*办理|请问.*需要|核实|确认.*信息|您.*排在|社工|联系您|电话畅通/;
-    // 客户特征词（需求方常用语）
-    const custPattern = /我想|我要|咨询|投诉|多少钱|怎么回事|退货|退款|我的订单|你们.*什么|好的.*谢谢|什么时候|多久|有没有|怎么办|办了|医保|新农合|好好好|那.*那|是吧|嗯嗯/;
+    // === 策略: 排他性模式评分 ===
+    // 说话人分离 API 可能混淆标签，导致双方文本混杂。
+    // 关键: 只用排他性模式（只有一方会说的句式），不用双方都可能说的词。
+    //
+    // 客服排他模式: 正式确认身份的句式（客户不会说"您是xxx的家长吗"）
+    const agentExclusive = /是.*的家长吗|是.*家长吗|欢迎致电|您好.*客服|为您.*办理|请问.*需要|确认.*信息|祝.*宝宝|祝.*健康|做.*回访|给您.*做|这边是.*基金会|给您做一个|现在排在第|排在第.*位|需要您保持|有社工会|给您打电话|社工.*联系|电话畅通/;
+    // 客户排他模式: 口语化确认/应答（客服不会说"行行行"、"好好好"、"谢谢啊"）
+    const custExclusive = /行行行|好好好|谢谢啊|是吧.*是吧|我.*这边.*是.*基金会|那个.*那个.*什么/;
 
-    // 计算每个说话人的客服得分和客户得分
+    // 计算排他性得分
     const scores = {};
     for (const s of speakers) {
       const text = speakerTexts[s].join("");
-      const agentHits = (text.match(agentPattern) || []).length;
-      const custHits = (text.match(custPattern) || []).length;
-      scores[s] = { agentHits, custHits };
-      logger.info(`[说话人分离] ${s}: 客服词=${agentHits}, 客户词=${custHits}`);
+      const agentEx = (text.match(agentExclusive) || []).length;
+      const custEx = (text.match(custExclusive) || []).length;
+      // 净得分 = 客服排他 - 客户排他（正数倾向客服，负数倾向客户）
+      scores[s] = { agentEx, custEx, net: agentEx - custEx };
+      logger.info(`[说话人分离] ${s}: 客服排他=${agentEx}, 客户排他=${custEx}, 净=${scores[s].net}`);
+      logger.info(`[说话人分离] ${s} 文本(前200): ${text.substring(0, 200)}`);
     }
 
-    // 根据得分分配角色：客服得分最高的 → agent，另一个 → customer
-    let roleMap = {};
+    // 根据排他性得分分配角色
+    const roleMap = {};
     if (speakers.length === 1) {
       roleMap[speakers[0]] = "agent";
     } else {
-      // 比较两个说话人的客服得分
       const s0 = speakers[0], s1 = speakers[1];
-      const agentScore0 = scores[s0].agentHits - scores[s0].custHits;
-      const agentScore1 = scores[s1].agentHits - scores[s1].custHits;
 
-      if (agentScore0 > agentScore1) {
+      if (scores[s0].net > scores[s1].net) {
         roleMap[s0] = "agent";
         roleMap[s1] = "customer";
-      } else if (agentScore1 > agentScore0) {
+      } else if (scores[s1].net > scores[s0].net) {
         roleMap[s0] = "customer";
         roleMap[s1] = "agent";
       } else {
-        // 得分相同时，使用"您"的频率判断（客服对客户用"您"，客户很少用"您"）
-        const ninCount0 = (speakerTexts[s0].join("").match(/您/g) || []).length;
-        const ninCount1 = (speakerTexts[s1].join("").match(/您/g) || []).length;
-        if (ninCount0 > ninCount1) {
-          roleMap[s0] = "agent";
-          roleMap[s1] = "customer";
-        } else if (ninCount1 > ninCount0) {
-          roleMap[s0] = "customer";
-          roleMap[s1] = "agent";
+        // 排他性得分相同 → 用对话结构判断
+        // 策略1: 第一句话通常是客服（拨出方先开口确认身份）
+        const firstSpeaker = utterances[0]?.speaker;
+        // 策略2: 客服通常先问身份确认（"您是xxx的家长吗"）
+        const hasIdentityQ = utterances.some(u =>
+          /是.*家长吗|是.*的家长吗/.test(u.text)
+        );
+        const identitySpeaker = hasIdentityQ
+          ? utterances.find(u => /是.*家长吗|是.*的家长吗/.test(u.text))?.speaker
+          : null;
+
+        if (identitySpeaker) {
+          // 谁说了"是xxx的家长"谁就是客服
+          roleMap[identitySpeaker] = "agent";
+          roleMap[identitySpeaker === s0 ? s1 : s0] = "customer";
+        } else if (firstSpeaker) {
+          // 拨出方（第一句话）默认为客服
+          roleMap[firstSpeaker] = "agent";
+          roleMap[firstSpeaker === s0 ? s1 : s0] = "customer";
         } else {
-          // 最终兜底：默认第一个是 customer（接电话方）
+          // 最终兜底
           roleMap[s0] = "customer";
           roleMap[s1] = "agent";
         }
