@@ -66,28 +66,28 @@
 - [x] CHANGELOG 更新
 - [x] Sprint 4 任务看板
 
-### 🔲 Sprint 5 待完成（6/19 ~ 6/29）
+### 🔲 Sprint 5 待完成(6/19 ~ 6/29)
 
-**P0 — 架构瘦身 + 测试基线（6/19 ~ 6/21）**
-- [ ] S5-001 合并 ASR 模块 (asr.js + multimodalAnalyzer.js → 一个) — moqun188
-- [ ] S5-002 删除 summarizer.js — moqun188
-- [ ] S5-003 scenarios.js 外部化为 JSON — moqun188
-- [ ] S5-004 构建质检测试集 20 通 — 乔布斯
-- [ ] S5-005 质检准确率 benchmark — moqun188
-- [ ] S5-006 ASR 准确率测试 (CER) — moqun188
+**P0 - 架构瘦身 + 测试基线(6/19 ~ 6/21)**
+- [x] S5-001 合并 ASR 模块 (asr.js + multimodalAnalyzer.js → 一个) - moqun188 ✅
+- [x] S5-002 删除 summarizer.js - moqun188 ✅
+- [x] S5-003 scenarios.js 外部化为 JSON - moqun188 ✅
+- [ ] S5-004 构建质检测试集 20 通 - 乔布斯
+- [ ] S5-005 质检准确率 benchmark - moqun188
+- [ ] S5-006 ASR 准确率测试 (CER) - moqun188
 
-**P1 — 套装模式 + 性能（6/21 ~ 6/25）**
-- [ ] S5-007 质检结果页重设计（问题句子标红+点击听音频）— sxbwork
-- [ ] S5-008 Dashboard 改为“今日关注” — sxbwork
-- [ ] S5-009 音频播放器组件 — sxbwork
-- [ ] S5-010 预处理与 API 并行化 — moqun188
-- [ ] S5-011 相同文件缓存 — moqun188
+**P1 - 套装模式 + 性能(6/21 ~ 6/25)**
+- [ ] S5-007 质检结果页重设计(问题句子标红+点击听音频)- sxbwork
+- [ ] S5-008 Dashboard 改为"今日关注" - sxbwork
+- [ ] S5-009 音频播放器组件 - sxbwork
+- [ ] S5-010 预处理与 API 并行化 - moqun188
+- [ ] S5-011 相同文件缓存 - moqun188
 
-**P2 — 数据飞轮 + SaaS（6/25 ~ 6/29）**
-- [ ] S5-012 质检员确认机制 — sxbwork
-- [ ] S5-013 反馈数据→规则迭代 — moqun188
-- [ ] S5-014 多租户 + JWT 认证 — moqun188
-- [ ] S5-015 PDF 报告导出 — sxbwork
+**P2 - 数据飞轮 + SaaS(6/25 ~ 6/29)**
+- [ ] S5-012 质检员确认机制 - sxbwork
+- [ ] S5-013 反馈数据→规则迭代 - moqun188
+- [ ] S5-014 多租户 + JWT 认证 - moqun188
+- [ ] S5-015 PDF 报告导出 - sxbwork
 
 ---
 
@@ -104,23 +104,24 @@
 
 ---
 
-## 技术架构(v0.5.0)
+## 技术架构（v0.5.0+）
 
 ```
-server.js (Express)
-  └── pipeline/index.js (编排器)
+server.js (Express, 167行)
+  └── pipeline/index.js (编排器, 184行)
         ├── preprocessor.js (音频预处理)
-        ├── multimodalAnalyzer.js (多模态单次调用: ASR+说话人+情绪)
-        ├── asr.js (ASR 回退)
+        ├── asr.js (统一ASR: 多模态优先, 纯ASR回退, 324行)
         ├── qualityAnalyzer.js (规则引擎质检)
         └── rulesLoader.js (规则加载)
   └── pipeline/statsManager.js → database.js (SQLite)
   └── pipeline/batchQueue.js (批量队列)
   └── pipeline/reportExporter.js (Excel 导出)
+  └── scenarios/default.json (Demo场景)
 ```
 
-**关键数字**:
-- 单次质检 API 调用:1 次
-- 前端页面:3 个
-- 代码行数:~2700 行
-- 测试覆盖:18 个测试(Jest)
+**关键数字**：
+- 单次质检 API 调用：1 次
+- 前端页面：3 个
+- Pipeline 文件：12 个
+- 代码行数：~2300 行
+- 测试覆盖：18 个测试（Jest）

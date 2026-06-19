@@ -25,20 +25,23 @@
 | 06-19 | 堆栈泄露修复 | v0.5.0 | S3-002 |
 | 06-19 | 并发写入修复 | v0.5.0 | S3-003 |
 | 06-19 | Pipeline 瘦身 | v0.5.0 | 删除 emotion/diarization 独立模块 |
+| 06-19 | **ASR 模块合并** | S5-001 | asr.js + multimodalAnalyzer.js → 统一 asr.js |
+| 06-19 | **删除 summarizer.js** | S5-002 | 模板替代 |
+| 06-19 | **场景外部化** | S5-003 | 202 行硬编码 → 42 行加载器 + JSON |
 
 ## 当前任务（Sprint 5）
 
-| # | 任务 | 优先级 | 预估 |
-|---|------|--------|------|
-| S5-001 | 合并 asr.js + multimodalAnalyzer.js 为一个 ASR 模块 | P0 | 3h |
-| S5-002 | 删除 summarizer.js | P0 | 0.5h |
-| S5-003 | scenarios.js 外部化为 JSON | P0 | 1h |
-| S5-005 | 质检准确率 benchmark | P0 | 2h |
-| S5-006 | ASR 准确率测试 (CER) | P0 | 1h |
-| S5-010 | 预处理与 API 并行化 | P1 | 2h |
-| S5-011 | 相同文件缓存 | P1 | 1h |
-| S5-013 | 反馈数据→规则迭代 | P2 | 3h |
-| S5-014 | 多租户 + JWT 认证 | P2 | 6h |
+| # | 任务 | 优先级 | 预估 | 状态 |
+|---|------|--------|------|------|
+| S5-001 | 合并 asr.js + multimodalAnalyzer.js | P0 | 3h | ✅ 完成 |
+| S5-002 | 删除 summarizer.js | P0 | 0.5h | ✅ 完成 |
+| S5-003 | scenarios.js 外部化为 JSON | P0 | 1h | ✅ 完成 |
+| S5-005 | 质检准确率 benchmark | P0 | 2h | 🔲 待开始 |
+| S5-006 | ASR 准确率测试 (CER) | P0 | 1h | 🔲 待开始 |
+| S5-010 | 预处理与 API 并行化 | P1 | 2h | 🔲 待开始 |
+| S5-011 | 相同文件缓存 | P1 | 1h | 🔲 待开始 |
+| S5-013 | 反馈数据→规则迭代 | P2 | 3h | 🔲 待开始 |
+| S5-014 | 多租户 + JWT 认证 | P2 | 6h | 🔲 待开始 |
 
 ## 待完成（Backlog）
 
