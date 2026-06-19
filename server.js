@@ -6,26 +6,19 @@ const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
 const QualityInspectionPipeline = require("./pipeline");
 const { getScenarioList } = require("./pipeline/scenarios");
-const { exportToExcel, exportToJSON } = require("./pipeline/reportExporter");
+const { exportToExcel } = require("./pipeline/reportExporter");
 const statsManager = require("./pipeline/statsManager");
-const { exportToObsidian, getVaultStats } = require("./pipeline/obsidianExporter");
 const { loadRules, listRules } = require("./pipeline/rulesLoader");
-const { generateEvolutionInsights } = require("./pipeline/selfEvolution");
 const BatchQueue = require("./pipeline/batchQueue");
 
 const app = express();
 const batchQueue = new BatchQueue();
 const PORT = process.env.PORT || 3000;
 
-// 清理上传的临时文件（质检成功后）
 function cleanupUploads(filePath, convertedPath) {
   try {
-    if (filePath && fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-    if (convertedPath && convertedPath !== filePath && fs.existsSync(convertedPath)) {
-      fs.unlinkSync(convertedPath);
-    }
+    if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    if (convertedPath && convertedPath !== filePath && fs.existsSync(convertedPath)) fs.unlinkSync(convertedPath);
   } catch (err) {
     console.error("清理上传文件失败:", err.message);
   }
@@ -44,13 +37,12 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     const allowed = [".wav", ".mp3", ".m4a", ".ogg", ".amr", ".flac"];
     const ext = path.extname(file.originalname).toLowerCase();
-    if (allowed.includes(ext)) {
-      cb(null, true);
-    } else {
-      cb(new Error(`不支持的文件格式: ${ext}，支持: ${allowed.join(", ")}`));
-    }
+    if (allowed.includes(ext)) cb(null, true);
+    else cb(new Error(`不支持的格式: ${ext}`));
   },
 });
+
+const pipeline = new QualityInspectionPipeline({ mockMode: false });
 
 function buildReportFileName(data, extension) {
   const rawBase = String(data.fileName || "质检报告").replace(/\.[^.\\/]+$/, "");
@@ -59,139 +51,98 @@ function buildReportFileName(data, extension) {
 }
 
 function encodeRFC5987Value(value) {
-  return encodeURIComponent(value).replace(/['()*]/g, (char) =>
-    `%${char.charCodeAt(0).toString(16).toUpperCase()}`
-  );
+  return encodeURIComponent(value).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
 }
 
-function buildAttachmentHeader(fileName, fallbackName) {
-  const fallback = String(fallbackName || "quality-report")
-    .replace(/[^\x20-\x7E]/g, "")
-    .replace(/[\\/:*?"<>|\r\n]+/g, "_")
-    .trim() || "quality-report";
-  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeRFC5987Value(fileName)}`;
+function buildAttachmentHeader(fileName, fallback) {
+  const fb = String(fallback || "quality-report").replace(/[^\x20-\x7E]/g, "").replace(/[\\/:*?"<>|\r\n]+/g, "_").trim() || "quality-report";
+  return `attachment; filename="${fb}"; filename*=UTF-8''${encodeRFC5987Value(fileName)}`;
 }
 
 app.use(express.static(path.join(__dirname, "public")));
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use(express.json({ limit: "10mb" }));
 
-app.get("/api/scenarios", (req, res) => {
-  res.json({ success: true, data: getScenarioList() });
-});
+// ─── API 路由 ───
 
+app.get("/api/scenarios", (req, res) => res.json({ success: true, data: getScenarioList() }));
+app.get("/api/rules", (req, res) => res.json({ success: true, data: listRules() }));
+
+// 单文件质检（NDJSON 流式）
 app.post("/api/inspect", upload.single("audio"), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "请上传音频文件" });
-  }
+  if (!req.file) return res.status(400).json({ error: "请上传音频文件" });
 
   res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
   res.setHeader("Transfer-Encoding", "chunked");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
+  if (res.socket) res.socket.setNoDelay(true);
 
-  if (res.socket) {
-    res.socket.setNoDelay(true);
-  }
-
-  const sendNDJSON = (obj) => {
-    res.write(JSON.stringify(obj) + "\n");
-  };
-
+  const sendNDJSON = (obj) => res.write(JSON.stringify(obj) + "\n");
   const stepStart = Date.now();
-  const ruleName = req.body?.ruleName || req.query?.ruleName || "default";
-  const pipeline = new QualityInspectionPipeline({ ruleName });
 
   try {
+    const ruleName = req.query.ruleName || req.body?.ruleName || "default";
     const result = await pipeline.run(req.file.path, req.file.originalname, null, async (stepIndex, step) => {
       sendNDJSON({ type: "step", stepIndex, step, elapsed: Date.now() - stepStart });
-      await new Promise(resolve => setImmediate(resolve));
+      await new Promise((r) => setImmediate(r));
     });
 
     statsManager.addInspection(result);
     sendNDJSON({ type: "complete", success: true, data: result });
-    // 质检成功后清理临时文件
     cleanupUploads(req.file.path, result.convertedPath);
   } catch (err) {
     console.error("质检失败:", err);
     sendNDJSON({ type: "error", error: err.message });
   }
-
   res.end();
 });
 
-// SSE 流式质检接口
-app.post("/api/inspect/stream", upload.single("audio"), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "请上传音频文件" });
-  }
-
-  res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("X-Accel-Buffering", "no");
-  res.flushHeaders();
-
-  const send = (type, payload) => {
-    res.write(JSON.stringify({ type, ...payload }) + "\n");
-    res.flush();
-  };
-
-  const stepStart = Date.now();
-  const ruleName = req.body?.ruleName || req.query?.ruleName || "default";
-  const pipeline = new QualityInspectionPipeline({ ruleName });
-
-  try {
-    const result = await pipeline.run(req.file.path, req.file.originalname, null, (stepIndex, step) => {
-      send("step", { stepIndex, step, elapsed: Date.now() - stepStart });
-    });
-
-    statsManager.addInspection(result);
-    send("complete", { success: true, data: result });
-    cleanupUploads(req.file.path, result.convertedPath);
-    res.end();
-  } catch (err) {
-    console.error("质检失败:", err);
-    send("error", { error: err.message });
-    res.end();
-  }
-});
-
+// Demo 质检
 app.post("/api/inspect/demo", async (req, res) => {
   try {
     const scenario = req.query.scenario || "A";
-    const ruleName = req.body?.ruleName || req.query?.ruleName || "default";
-    const demoPipeline = new QualityInspectionPipeline({ mockMode: false, ruleName });
-    const result = await demoPipeline.run("demo", "demo_sample.wav", scenario);
+    const result = await pipeline.run("demo", "demo_sample.wav", scenario);
     statsManager.addInspection(result);
-    res.json({
-      success: true,
-      data: result,
-    });
+    res.json({ success: true, data: result });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get("/api/stats", (req, res) => {
-  res.json(statsManager.getStats());
+// 批量质检
+app.post("/api/batch/inspect", upload.array("audio", 20), async (req, res) => {
+  if (!req.files || req.files.length === 0) return res.status(400).json({ error: "请上传音频文件" });
+  const batchId = batchQueue.createBatch(req.files.map((f) => ({ path: f.path, name: f.originalname })));
+  res.json({ success: true, batchId, fileCount: req.files.length });
+  batchQueue.processBatch(batchId, async (filePath, fileName) => {
+    const result = await pipeline.run(filePath, fileName);
+    statsManager.addInspection(result);
+    cleanupUploads(filePath, result.convertedPath);
+    return result;
+  });
 });
 
-app.get("/api/token-usage", (req, res) => {
-  res.json(statsManager.getTokenStats());
+app.get("/api/batch/:batchId", (req, res) => {
+  const batch = batchQueue.getBatch(req.params.batchId);
+  if (!batch) return res.status(404).json({ error: "批次不存在" });
+  res.json(batch);
 });
 
+app.get("/api/batch", (req, res) => res.json(batchQueue.listBatches()));
+
+// 统计 & 历史
+app.get("/api/stats", (req, res) => res.json(statsManager.getStats()));
 app.get("/api/history", (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const pageSize = parseInt(req.query.pageSize) || 20;
   res.json(statsManager.getHistory(page, pageSize));
 });
 
+// 导出（只保留 Excel）
 app.post("/api/export/excel", async (req, res) => {
   try {
     const data = req.body;
-    if (!data || !data.quality) {
-      return res.status(400).json({ error: "请提供质检结果数据" });
-    }
+    if (!data?.quality) return res.status(400).json({ error: "请提供质检结果数据" });
     const buffer = await exportToExcel(data);
     const fileName = buildReportFileName(data, "xlsx");
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -203,307 +154,14 @@ app.post("/api/export/excel", async (req, res) => {
   }
 });
 
-app.post("/api/export/json", async (req, res) => {
-  try {
-    const data = req.body;
-    if (!data || !data.quality) {
-      return res.status(400).json({ error: "请提供质检结果数据" });
-    }
-    const buffer = exportToJSON(data);
-    const fileName = buildReportFileName(data, "json");
-    res.setHeader("Content-Type", "application/json; charset=utf-8");
-    res.setHeader("Content-Disposition", buildAttachmentHeader(fileName, "quality-report.json"));
-    res.send(buffer);
-  } catch (err) {
-    console.error("JSON导出失败:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post("/api/export/obsidian", async (req, res) => {
-  try {
-    const data = req.body;
-    if (!data || !data.quality) {
-      return res.status(400).json({ error: "请提供质检结果数据" });
-    }
-    const result = await exportToObsidian(data);
-    res.json({
-      success: true,
-      message: `质检报告已成功保存到 Obsidian`,
-      filePath: result.filePath,
-      fileName: result.fileName,
-      vaultPath: result.vaultPath,
-    });
-  } catch (err) {
-    console.error("Obsidian导出失败:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get("/api/obsidian/stats", (req, res) => {
-  try {
-    const stats = getVaultStats();
-    res.json({
-      success: true,
-      data: stats,
-    });
-  } catch (err) {
-    console.error("获取Obsidian统计失败:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 自我进化 API
-app.get("/api/evolution", (req, res) => {
-  try {
-    const db = require("./pipeline/database").getDb();
-    const insights = generateEvolutionInsights(db);
-    db.close();
-    res.json({ success: true, data: insights });
-  } catch (err) {
-    console.error("自我进化分析失败:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 规则管理 API
-app.get("/api/rules", (req, res) => {
-  try {
-    const rules = listRules();
-    res.json({ success: true, data: rules });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get("/api/rules/:name", (req, res) => {
-  try {
-    const rules = loadRules(req.params.name);
-    res.json({ success: true, data: rules });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 批量质检 API — 复用已有的 upload 实例
-app.post("/api/batch/inspect", upload.array("audio", 20), async (req, res) => {
-  try {
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ error: "请上传至少一个音频文件" });
-    }
-
-    const ruleName = req.body?.ruleName || "default";
-    const job = batchQueue.createJob(req.files);
-    const batchId = job.batchId;
-
-    // 异步逐个处理，不阻塞响应
-    (async () => {
-      for (const item of job.items) {
-        batchQueue.updateItemStatus(batchId, item.itemId, "processing");
-        try {
-          const pipeline = new QualityInspectionPipeline({ ruleName });
-          const result = await pipeline.run(item.filePath, item.fileName, null, () => {});
-          statsManager.addInspection(result);
-          batchQueue.updateItemStatus(batchId, item.itemId, "completed", {
-            totalScore: result.quality.totalScore,
-            level: result.quality.level,
-          });
-          cleanupUploads(item.filePath, result.convertedPath);
-        } catch (err) {
-          console.error(`[Batch] ${item.fileName} 处理失败:`, err.message);
-          batchQueue.updateItemStatus(batchId, item.itemId, "failed", null, err.message);
-        }
-      }
-    })();
-
-    res.json({
-      success: true,
-      data: {
-        batchId,
-        total: job.total,
-        status: "running",
-      },
-    });
-  } catch (err) {
-    console.error("批量质检失败:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get("/api/batch/:batchId", (req, res) => {
-  const job = batchQueue.getJob(req.params.batchId);
-  if (!job) {
-    return res.status(404).json({ error: "批次不存在" });
-  }
-  res.json({ success: true, data: job });
-});
-
-app.get("/api/batch", (req, res) => {
-  const jobs = batchQueue.getAllJobs();
-  res.json({ success: true, data: jobs });
-});
-
-app.post("/api/test/asr", upload.single("audio"), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: "请上传音频文件" });
-    }
-
-    const ASREngine = require("./pipeline/asr");
-    const { logger } = require("./pipeline/logger");
-    const { convertToMp3, prepareAudioForASR } = require("./pipeline/audioConverter");
-
-    logger.info(`[测试ASR] 测试文件: ${req.file.path}`);
-
-    const fs = require("fs");
-    const path = require("path");
-    const apiKey = process.env.MIMO_API_KEY;
-    const baseUrl = process.env.MIMO_BASE_URL || "https://api.xiaomimimo.com/v1";
-    const modelName = process.env.ASR_MODEL || "mimo-v2.5-asr";
-
-    const ext = path.extname(req.file.path).toLowerCase();
-    let targetFile = req.file.path;
-    let converted = false;
-    let conversionInfo = null;
-    let mimeType = ext === ".mp3" ? "audio/mpeg" : ext === ".wav" ? "audio/wav" : "audio/mp4";
-
-    // 统一准备音频：wav 直接用，其他格式转 MP3
-    try {
-      const prepared = await prepareAudioForASR(req.file.path, {
-        kbps: 64, sampleRate: 16000, channels: 1,
-      });
-      targetFile = prepared.filePath;
-      mimeType = prepared.mimeType;
-      converted = prepared.converted;
-      if (converted) {
-        const stat = fs.statSync(targetFile);
-        conversionInfo = { size: stat.size, mimeType, duration: 0 };
-        logger.info(`[测试ASR] ${ext} 已转换为 mp3: ${targetFile}`);
-      }
-    } catch (convErr) {
-      logger.warn(`[测试ASR] 格式转换失败: ${convErr.message}`);
-    }
-
-    const audioBuffer = fs.readFileSync(targetFile);
-    const audioBase64 = audioBuffer.toString("base64");
-    const dataUrl = `data:${mimeType};base64,${audioBase64}`;
-
-    logger.info(`[测试ASR] 调用小米 MiMo API...`);
-    logger.info(`[测试ASR] API Key: ${apiKey ? "已配置" : "未配置"}`);
-    logger.info(`[测试ASR] Model: ${modelName}`);
-    logger.info(`[测试ASR] 文件大小: ${audioBuffer.length} bytes`);
-    logger.info(`[测试ASR] MIME类型: ${mimeType}`);
-
-    const startTime = Date.now();
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "api-key": apiKey,
-      },
-      body: JSON.stringify({
-        model: modelName,
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "input_audio",
-                input_audio: {
-                  data: dataUrl,
-                },
-              },
-              {
-                type: "text",
-                text: "请进行语音识别并返回JSON格式，包含时间戳和分段信息。格式：{\"duration\": 总时长(秒), \"segments\": [{\"start\": 开始时间(秒), \"end\": 结束时间(秒), \"text\": \"文本内容\"}, ...]}",
-              },
-            ],
-          },
-        ],
-        asr_options: {
-          language: process.env.ASR_LANGUAGE || "zh",
-        },
-      }),
-    });
-
-    const responseTime = Date.now() - startTime;
-    const responseText = await response.text();
-
-    logger.info(`[测试ASR] 响应状态: ${response.status}`);
-    logger.info(`[测试ASR] 响应时间: ${responseTime}ms`);
-    logger.info(`[测试ASR] 响应内容: ${responseText.substring(0, 500)}`);
-
-    let responseJson;
-    try {
-      responseJson = JSON.parse(responseText);
-    } catch (e) {
-      responseJson = { raw: responseText };
-    }
-
-    res.json({
-      success: response.ok,
-      status: response.status,
-      responseTime: `${responseTime}ms`,
-      apiKeyConfigured: Boolean(apiKey),
-      model: modelName,
-      fileSize: audioBuffer.length,
-      mimeType: mimeType,
-      baseUrl: baseUrl,
-      converted: converted,
-      conversionInfo: conversionInfo,
-      response: responseJson,
-    });
-  } catch (err) {
-    console.error("[测试ASR] 失败:", err);
-    res.status(500).json({
-      success: false,
-      error: err.message,
-    });
-  }
-});
-
-app.post("/api/test/summary", async (req, res) => {
-  try {
-    const { logger } = require("./pipeline/logger");
-    const Summarizer = require("./pipeline/summarizer");
-    const summarizer = new Summarizer();
-
-    // 模拟对话数据
-    const sampleUtterances = [
-      { role: "agent", text: "您好，欢迎致电客服中心，请问有什么可以帮您？", emotion: { label: "平静" } },
-      { role: "customer", text: "你好，我想咨询一下关于退货的问题。", emotion: { label: "平静" } },
-      { role: "agent", text: "好的，请问您是想退哪件商品呢？", emotion: { label: "平静" } },
-      { role: "customer", text: "是一件衣服，码数不合适。", emotion: { label: "平静" } },
-      { role: "agent", text: "了解，我帮您查一下订单信息。", emotion: { label: "平静" } },
-    ];
-
-    logger.info("[测试总结] 开始测试总结功能");
-
-    const result = await summarizer.summarize(sampleUtterances, { overall: "客户情绪稳定" });
-
-    res.json({
-      success: true,
-      generatedBy: result.generatedBy,
-      summary: result,
-    });
-  } catch (err) {
-    console.error("[测试总结] 失败:", err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
+// 错误处理
 app.use((err, req, res, next) => {
-  if (err instanceof multer.MulterError) {
-    return res.status(400).json({ error: `上传错误: ${err.message}` });
-  }
-  if (err.message) {
-    return res.status(400).json({ error: err.message });
-  }
+  if (err instanceof multer.MulterError) return res.status(400).json({ error: `上传错误: ${err.message}` });
+  if (err.message) return res.status(400).json({ error: err.message });
   next();
 });
 
 app.listen(PORT, () => {
-  console.log(`📞 录音质检系统 MVP 启动成功`);
-  console.log(`   🌐 打开浏览器: http://localhost:${PORT}`);
-  console.log(`   📁 上传音频文件或点击"模拟Demo"体验`);
+  console.log(`📞 CallQ 客服质检系统启动成功`);
+  console.log(`   🌐 http://localhost:${PORT}`);
 });
