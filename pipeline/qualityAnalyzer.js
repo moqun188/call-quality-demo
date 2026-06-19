@@ -52,23 +52,31 @@ class QualityAnalyzer {
   }
 
   _evalCompliance(agentTexts, fullText) {
-    let score = 7;
+    let score = 5;
 
     const hasOpening = this.standards.opening.some((p) => fullText.includes(p));
     const hasClosing = this.standards.closing.some((p) => fullText.includes(p));
-    const politeCount = this.standards.polite.filter((p) => fullText.includes(p)).length;
 
-    if (hasOpening) score += 1;
-    if (hasClosing) score += 1;
-    if (politeCount >= 4) score += 1;
+    // 礼貌用语频次加权
+    let politeTotal = 0;
+    for (const word of this.standards.polite) {
+      const matches = fullText.match(new RegExp(word, "g"));
+      if (matches) politeTotal += matches.length;
+    }
+
+    if (hasOpening) score += 1.5;
+    if (hasClosing) score += 1.5;
+    if (politeTotal >= 8) score += 2;
+    else if (politeTotal >= 4) score += 1;
+    else if (politeTotal >= 2) score += 0.5;
 
     return {
-      score: Math.min(10, score),
+      score: Math.min(10, Math.round(score * 10) / 10),
       reason: hasOpening && hasClosing
-        ? "开场白和结束语规范，礼貌用语使用充分"
-        : "开场白或结束语有缺失",
+        ? `开场白和结束语规范，礼貌用语出现 ${politeTotal} 次`
+        : `开场白或结束语有缺失，礼貌用语 ${politeTotal} 次`,
       evidence: [
-        `礼貌用语出现 ${politeCount} 次`,
+        `礼貌用语累计出现 ${politeTotal} 次`,
         hasOpening ? "已使用标准开场白" : "未检测到标准开场白",
         hasClosing ? "已使用标准结束语" : "未检测到标准结束语",
       ],
@@ -76,30 +84,39 @@ class QualityAnalyzer {
   }
 
   _evalKnowledge(agentTexts, customerTexts) {
-    let score = 7;
+    let score = 5;
 
     const customerQuestions = customerTexts.filter((t) => t.includes("?") || t.includes("？") || t.includes("怎么") || t.includes("如何") || t.includes("吗"));
     const customerConcerns = customerTexts.filter((t) => t.includes("不合适") || t.includes("偏小") || t.includes("运费") || t.includes("退货"));
 
+    // 回答了客户问题 +1
+    if (customerQuestions.length > 0 && agentTexts.length >= customerQuestions.length) score += 1;
+    // 解决了客户关切 +1
     if (customerConcerns.length > 0) score += 1;
-    if (agentTexts.some((t) => t.includes("码数") || t.includes("退货") || t.includes("运费"))) score += 1;
-
+    // 提到了关键业务术语 +1
+    const businessTerms = ["码数", "退货", "运费", "退款", "订单", "快递", "寄回"];
+    const agentTermHits = businessTerms.filter((t) => agentTexts.some((a) => a.includes(t))).length;
+    if (agentTermHits >= 3) score += 2;
+    else if (agentTermHits >= 2) score += 1;
+    // 提供了具体流程信息 +1
     const hasCorrective = agentTexts.some((t) => t.includes("7天") || t.includes("退货期") || t.includes("24小时"));
     if (hasCorrective) score += 1;
 
     return {
       score: Math.min(10, score),
-      reason: "准确回答退货流程和运费问题，知识点掌握良好",
+      reason: agentTermHits >= 3
+        ? `准确回答了 ${customerConcerns.length} 个核心关切，业务术语覆盖 ${agentTermHits} 项`
+        : `业务术语覆盖不足（${agentTermHits}/${businessTerms.length}）`,
       evidence: [
         `客户提出 ${customerConcerns.length} 个核心关切`,
-        "准确说明退货期限 (7天)",
-        "明确运费承担方和退款时效 (24小时)",
+        `客服覆盖 ${agentTermHits} 项业务术语`,
+        hasCorrective ? "提供了具体流程信息" : "缺少具体流程信息",
       ],
     };
   }
 
   _evalProcess(utterances) {
-    let score = 6;
+    let score = 4;
     const fullText = utterances.map((u) => u.text).join("");
 
     const stages = {
@@ -122,23 +139,31 @@ class QualityAnalyzer {
   }
 
   _evalCommunication(utterances, emotionResult) {
-    let score = 7;
+    let score = 5;
     const agentUtterances = utterances.filter((u) => u.role === "agent");
 
     const hasConfirm = agentUtterances.some((u) => u.text.includes("理解") || u.text.includes("查到") || u.text.includes("请问"));
-    const hasEmpathy = agentUtterances.some((u) => u.text.includes("理解") || u.text.includes("麻烦"));
+    const hasEmpathy = agentUtterances.some((u) => u.text.includes("理解") || u.text.includes("麻烦") || u.text.includes("抱歉"));
     const hasGuide = agentUtterances.some((u) => u.text.includes("可以") || u.text.includes("联系") || u.text.includes("发到"));
+    const hasProactive = agentUtterances.some((u) => u.text.includes("帮您") || u.text.includes("为您") || u.text.includes("我帮"));
 
     if (hasConfirm) score += 1;
-    if (hasEmpathy) score += 1;
+    if (hasEmpathy) score += 1.5;
     if (hasGuide) score += 1;
+    if (hasProactive) score += 0.5;
+
+    // 客户情绪改善加分
+    if (emotionResult?.trend?.resolved) score += 1;
 
     return {
-      score: Math.min(10, score),
-      reason: "客服有共情表达，能主动引导客户",
+      score: Math.min(10, Math.round(score * 10) / 10),
+      reason: hasEmpathy && hasGuide
+        ? "客服有共情表达，能主动引导客户"
+        : "沟通技巧有提升空间",
       evidence: [
-        hasEmpathy ? "表达了同理心 ('完全理解')" : "缺乏同理心表达",
+        hasEmpathy ? "表达了同理心" : "缺乏同理心表达",
         hasGuide ? "主动提供后续步骤指引" : "未主动引导客户",
+        hasProactive ? "主动提供帮助" : "缺少主动性",
         emotionResult?.trend?.resolved ? "客户问题得到解决" : "客户情绪未改善",
       ],
     };

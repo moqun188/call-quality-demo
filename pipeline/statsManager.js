@@ -159,7 +159,6 @@ function tryParse(json, fallback) {
 function addInspection(result) {
   const timestamp = new Date().toISOString();
   const record = {
-    id: nextInspectionId(),
     timestamp,
     fileName: result.fileName,
     totalTime: result.totalTime,
@@ -178,7 +177,7 @@ function addInspection(result) {
     callSummary: result.callSummary || result.summary,
   };
 
-  stmts.insertInspection.run(
+  const info = stmts.insertInspection.run(
     timestamp, record.fileName, record.totalTime, record.totalScore, record.level, record.emotion,
     record.usedMultimodal ? 1 : 0, record.apiCallCount, record.sessionId,
     JSON.stringify(record.dimensions),
@@ -189,6 +188,8 @@ function addInspection(result) {
     JSON.stringify(record.summary),
     JSON.stringify(record.callSummary)
   );
+
+  record.id = info.lastInsertRowid;
 
   // Token 用量记录
   addTokenRecord(result);

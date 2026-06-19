@@ -353,10 +353,6 @@ app.post("/api/test/asr", upload.single("audio"), async (req, res) => {
       baseUrl: baseUrl,
       converted: converted,
       conversionInfo: conversionInfo,
-      requestHeaders: {
-        "Content-Type": "application/json",
-        "api-key": apiKey ? `${apiKey.substring(0, 8)}...` : "未配置",
-      },
       response: responseJson,
     });
   } catch (err) {
@@ -364,7 +360,6 @@ app.post("/api/test/asr", upload.single("audio"), async (req, res) => {
     res.status(500).json({
       success: false,
       error: err.message,
-      stack: err.stack,
     });
   }
 });
