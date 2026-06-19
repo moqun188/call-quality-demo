@@ -784,4 +784,96 @@
     if (v < 0.7) return "#f59e0b";
     return "#22c55e";
   }
+
+  // --- S5-012: 质检员反馈 ---
+
+  (function initFeedback() {
+    var feedbackActions = document.getElementById("feedbackActions");
+    var feedbackForm = document.getElementById("feedbackForm");
+    var feedbackResult = document.getElementById("feedbackResult");
+    var confirmBtn = document.getElementById("feedbackConfirmBtn");
+    var correctBtn = document.getElementById("feedbackCorrectBtn");
+    var submitBtn = document.getElementById("feedbackSubmitBtn");
+    var cancelBtn = document.getElementById("feedbackCancelBtn");
+    var humanScoreInput = document.getElementById("humanScore");
+    var feedbackNotes = document.getElementById("feedbackNotes");
+
+    if (!confirmBtn) return;
+
+    confirmBtn.addEventListener("click", function () {
+      submitFeedback("confirm");
+    });
+
+    correctBtn.addEventListener("click", function () {
+      feedbackActions.hidden = true;
+      feedbackForm.hidden = false;
+      if (currentResultData && currentResultData.quality) {
+        humanScoreInput.value = currentResultData.quality.totalScore;
+      }
+    });
+
+    cancelBtn.addEventListener("click", function () {
+      feedbackForm.hidden = true;
+      feedbackActions.hidden = false;
+    });
+
+    submitBtn.addEventListener("click", function () {
+      submitFeedback("correct");
+    });
+
+    function submitFeedback(type) {
+      if (!currentResultData || !currentResultData.inspectionId) {
+        showFeedbackResult("error", "无法提交反馈：缺少质检记录 ID");
+        return;
+      }
+
+      var body = {
+        inspectionId: currentResultData.inspectionId,
+        feedbackType: type,
+      };
+
+      if (type === "correct") {
+        body.humanScore = parseInt(humanScoreInput.value) || null;
+        body.notes = feedbackNotes.value || null;
+      }
+
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (res.success) {
+            feedbackActions.hidden = true;
+            feedbackForm.hidden = true;
+            showFeedbackResult(
+              "success",
+              type === "confirm" ? "已确认 AI 质检结果准确" : "纠正已提交，感谢反馈！"
+            );
+          } else {
+            showFeedbackResult("error", res.error || "提交失败");
+          }
+        })
+        .catch(function (err) {
+          showFeedbackResult("error", "网络错误: " + err.message);
+        });
+    }
+
+    function showFeedbackResult(type, msg) {
+      feedbackResult.hidden = false;
+      feedbackResult.className = "feedback-result feedback-" + type;
+      feedbackResult.textContent = msg;
+    }
+
+    // 重置反馈状态（重新质检时）
+    var origReset = DOM.resetBtn.onclick;
+    DOM.resetBtn.addEventListener("click", function () {
+      feedbackActions.hidden = false;
+      feedbackForm.hidden = true;
+      feedbackResult.hidden = true;
+      humanScoreInput.value = "";
+      feedbackNotes.value = "";
+    });
+  })();
 })();

@@ -124,6 +124,31 @@
         <button class="btn btn-export ripple-btn" id="exportJsonBtn">📥 导出 JSON</button>
       </div>
 
+      <!-- S5-012: 质检员确认/纠正 -->
+      <div class="section" id="feedbackSection">
+        <h3>🔍 质检员确认</h3>
+        <p class="feedback-hint">请确认 AI 质检结果是否准确</p>
+        <div class="feedback-actions" id="feedbackActions">
+          <button class="btn btn-success ripple-btn" id="feedbackConfirmBtn">✅ 确认准确</button>
+          <button class="btn btn-warning ripple-btn" id="feedbackCorrectBtn">✏️ 需要纠正</button>
+        </div>
+        <div class="feedback-form" id="feedbackForm" hidden>
+          <div class="form-group">
+            <label>人工评分：</label>
+            <input type="number" id="humanScore" min="0" max="100" placeholder="0-100">
+          </div>
+          <div class="form-group">
+            <label>备注：</label>
+            <textarea id="feedbackNotes" rows="3" placeholder="说明纠正原因..."></textarea>
+          </div>
+          <div class="feedback-form-actions">
+            <button class="btn btn-primary ripple-btn" id="feedbackSubmitBtn">提交纠正</button>
+            <button class="btn btn-secondary ripple-btn" id="feedbackCancelBtn">取消</button>
+          </div>
+        </div>
+        <div class="feedback-result" id="feedbackResult" hidden></div>
+      </div>
+
       <button class="btn btn-primary ripple-btn" id="resetBtn">重新质检</button>
     </div>
 

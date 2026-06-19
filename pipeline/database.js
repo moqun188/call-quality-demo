@@ -60,9 +60,28 @@ function initDb(db) {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS feedback (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      inspection_id INTEGER NOT NULL,
+      feedback_type TEXT NOT NULL, -- 'confirm' | 'correct'
+      ai_score INTEGER,
+      human_score INTEGER,
+      ai_level TEXT,
+      human_level TEXT,
+      dimension_corrections TEXT, -- JSON: {"compliance":{"ai":9,"human":7},...}
+      role_corrections TEXT,      -- JSON: {"speaker_0":"customer",...}
+      violations_feedback TEXT,   -- JSON: [{"type":"prohibited_word","confirmed":true},...]
+      notes TEXT,
+      reviewer TEXT DEFAULT '质检员',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (inspection_id) REFERENCES inspections(id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_inspections_timestamp ON inspections(timestamp);
     CREATE INDEX IF NOT EXISTS idx_inspections_score ON inspections(total_score);
     CREATE INDEX IF NOT EXISTS idx_token_usage_timestamp ON token_usage(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_feedback_inspection ON feedback(inspection_id);
+    CREATE INDEX IF NOT EXISTS idx_feedback_type ON feedback(feedback_type);
   `);
 }
 
