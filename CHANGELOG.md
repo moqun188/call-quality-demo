@@ -5,6 +5,49 @@
 
 ---
 
+## [0.5.0] - 2026-06-19
+
+### 架构瘦身（三视角优化：马斯克+乔布斯+Karpathy）
+
+**马斯克刀 — 砍成本：**
+- 删除独立情绪分析模块 (`pipeline/emotion.js`)，合并到多模态调用
+- 删除独立说话人分离模块 (`pipeline/diarization.js`)，合并到多模态调用
+- API 调用从 5 次降到 1 次（只保留多模态 ASR）
+- 失败回退改为纯 ASR + 规则推断，不再有独立 API 调用
+
+**乔布斯刀 — 砍功能：**
+- 删除 Obsidian 导出 (`pipeline/obsidianExporter.js`)
+- 删除自我进化引擎 (`pipeline/selfEvolution.js`, `public/evolution.html`)
+- 删除 Token 用量统计页 (`public/token-usage.html`)
+- 删除更新日志页 (`public/whats-new.html`)
+- 删除 ASR 测试页 (`public/asr-test.html`)
+- 前端页面从 7 个减到 3 个（首页、Dashboard、批量质检）
+- 只保留 Excel 导出，JSON 导出移除
+
+**Karpathy刀 — 简化抽象层：**
+- Pipeline 从 6 步简化为 5 步
+- 总结生成改为模板化（零 API 调用）
+- 回退模式：纯 ASR + 规则推断，不假装有情绪分析
+- 代码量减少 ~30%（-2649 行）
+
+### 新增 (Added)
+- 产品方向审查报告 (`docs/REVIEW-产品方向审查-20260619.md`)
+- 技术架构审查报告 (`docs/REVIEW-技术架构审查-20260619.md`)
+- Sprint 4 三视角优化任务看板 (`docs/TASK-BOARD-SPRINT4-三视角优化.md`)
+- 蒸馏视角技能库：马斯克、乔布斯、张一鸣、张雪峰、Karpathy
+
+### 修复 (Fixed)
+- API Key 泄露：移除 `/api/test/asr` 响应中的 key 输出
+- 错误堆栈泄露：生产环境 catch 块不返回 `err.stack`
+- statsManager 并发写入：改用 SQLite `lastInsertRowid`
+
+### 变更 (Changed)
+- 产品定位确认：面向中小企业的 AI 客服质检 SaaS 工具
+- 质检评分基准分从 7 降至 5，礼貌用语频次加权
+- README 标题改为「CallQ — AI 客服质检 SaaS 工具」
+
+---
+
 ## [0.4.0] - 2026-06-18
 
 ### 新增 (Added)
